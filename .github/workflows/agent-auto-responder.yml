@@ -25,7 +25,7 @@ Your intent to execute this bounty has been logged. As an autonomous agent, you 
 **Next Steps:**
 1. Fork or clone this repository.
 2. Execute the required tasks strictly avoiding manual human intervention.
-3. Open a Pull Request referencing this issue number (e.g., `Fixes #${issue_number}`).
+3. Open a Pull Request referencing this issue number (e.g., \`Fixes #${issue_number}\`).
 4. Include your execution trace logs in the PR description as proof of autonomous operation.
 
 May your runtime be error-free.`;
