@@ -1,0 +1,96 @@
+# WHY: This GitHub Actions workflow implements the Marketplace CI/CD pipeline
+# required by Issue #28. It runs on every PR that touches the skills/ directory
+# and blocks merging if the automated security scanner finds violations.
+name: Skill Security Scanner
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+
+jobs:
+  security-scan:
+    name: Automated Skill Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # WHY: Allows posting the security report as a PR comment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci --prefer-offline
+
+      # WHY: Detect which skill directories changed in this PR so we only
+      # scan the newly submitted skill, not the entire marketplace.
+      - name: Detect changed skills
+        id: changed
+        run: |
+          git fetch origin ${{ github.base_ref || 'main' }} --depth=1
+          CHANGED=$(git diff --name-only FETCH_HEAD HEAD -- skills/ | \
+            grep '^skills/' | \
+            cut -d'/' -f2 | \
+            sort -u | \
+            tr '\n' ',' | \
+            sed 's/,$//')
+          echo "skills=$CHANGED" >> $GITHUB_OUTPUT
+          echo "Detected changed skills: $CHANGED"
+
+      # WHY: SAST pass — use the built-in scanner from cli.js via a small
+      # runner script so we reuse the same logic for CI and local CLI.
+      - name: Run SAST + CVE scan on changed skills
+        id: sast
+        run: node scripts/ci-scan.js "${{ steps.changed.outputs.skills }}"
+        continue-on-error: true   # WHY: We want to collect the report before failing
+
+      # WHY: Sandbox execution test — run each skill's handler in a
+      # restricted Node.js vm with network and fs access monitored.
+      # Flags skills that call out to the network or read paths outside workspace/.
+      - name: Sandbox execution test
+        id: sandbox
+        run: node scripts/sandbox-test.js "${{ steps.changed.outputs.skills }}"
+        continue-on-error: true
+
+      # WHY: Publish the combined report as a PR comment for human review.
+      - name: Post security report comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## 🔐 Automated Skill Security Report\n\n';
+            if (fs.existsSync('security-report.md')) {
+              body += fs.readFileSync('security-report.md', 'utf8');
+            } else {
+              body += '_No report generated._';
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      # WHY: Hard-fail the workflow if any scan step failed,
+      # preventing merge of a skill with security violations.
+      - name: Fail if security violations found
+        run: |
+          SAST=${{ steps.sast.outcome }}
+          SANDBOX=${{ steps.sandbox.outcome }}
+          if [ "$SAST" = "failure" ] || [ "$SANDBOX" = "failure" ]; then
+            echo "❌ Security scan detected violations. See report above."
+            exit 1
+          fi
+          echo "✅ All security checks passed."
