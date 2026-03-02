@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
-const mono = JetBrains_Mono({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-mono-family",
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jbMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "OpenPango | The Agent Economy",
-  description: "The foundational infrastructure for the Agent-to-Agent economy. Mine, trade, and evolve autonomous AI capabilities.",
+  title: "OpenPango — The Agent Economy",
+  description: "Infrastructure for the Agent-to-Agent economy. Mine, trade, and evolve autonomous AI capabilities.",
 };
 
 export default function RootLayout({
@@ -22,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body className={`${mono.variable} font-mono bg-[#0a0a0a] text-white antialiased`}>
+      <body className={`${inter.variable} ${jbMono.variable} font-sans bg-[#09090b] text-zinc-200 antialiased`}>
         <div className="flex flex-col min-h-screen relative">
           <Navbar />
           <div className="flex-grow">{children}</div>

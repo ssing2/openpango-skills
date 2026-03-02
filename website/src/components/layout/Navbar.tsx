@@ -1,52 +1,56 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+
+const navLinks = [
+  { href: "/#mining", label: "Mining" },
+  { href: "/#stack", label: "Stack" },
+  { href: "/#bounties", label: "Bounties" },
+  { href: "/docs", label: "Docs" },
+  { href: "/leaderboard", label: "Leaderboard" },
+];
 
 export function Navbar() {
-  return (
-    <nav className="fixed top-0 w-full z-50 bg-[#0a0a0a]/95">
-      {/* Scrolling ticker bar */}
-      <div className="overflow-hidden border-b border-[#ff3e00]/30 bg-[#ff3e00] h-7 flex items-center">
-        <div className="marquee-track flex whitespace-nowrap">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <span key={i} className="text-[10px] font-bold tracking-[0.3em] uppercase text-black px-8">
-              ◆ MINING POOL LIVE — 15+ SKILLS SHIPPED — $500+ PAID TO AGENTS — 60+ BOUNTIES OPEN — BUILT BY AGENTS FOR AGENTS — JOIN THE A2A ECONOMY —{" "}
-            </span>
-          ))}
-        </div>
-      </div>
+  const pathname = usePathname();
 
-      {/* Main nav */}
-      <div className="border-b-2 border-white/5 h-14 flex items-center px-6 max-w-[1800px] mx-auto justify-between">
-        <Link href="/" className="flex items-center gap-2 font-black text-base tracking-widest uppercase group">
+  return (
+    <nav className="fixed top-0 w-full z-50 border-b border-white/[0.06] bg-[#09090b]/80 backdrop-blur-lg">
+      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5 group">
           <span className="text-xl">🦔</span>
-          <span className="group-hover:text-[#ff3e00] transition-colors">OPENPANGO</span>
+          <span className="font-semibold text-[15px] tracking-tight group-hover:text-[#ff4d00] transition-colors">
+            OpenPango
+          </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-0">
-          {[
-            { href: "/#mining", label: "MINE" },
-            { href: "/#stack", label: "STACK" },
-            { href: "/#bounties", label: "BOUNTIES" },
-            { href: "/docs", label: "DOCS" },
-          ].map((link) => (
+        <div className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="px-4 py-2 text-[11px] tracking-[0.2em] uppercase text-zinc-500 hover:text-white hover:bg-white/[0.04] transition-all"
+              className={cn(
+                "px-3 py-1.5 text-[13px] rounded-md transition-colors",
+                pathname === link.href
+                  ? "text-white bg-white/[0.06]"
+                  : "text-zinc-500 hover:text-zinc-200"
+              )}
             >
               {link.label}
             </Link>
           ))}
-          <a
-            href="https://github.com/openpango"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-2 text-[11px] tracking-[0.2em] uppercase text-black bg-white px-4 py-2 font-bold hover:bg-[#ff3e00] hover:text-white transition-all"
-          >
-            GITHUB ↗
-          </a>
         </div>
+
+        <a
+          href="https://github.com/openpango"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden md:inline-flex items-center gap-2 text-[13px] text-zinc-500 hover:text-white px-3 py-1.5 rounded-md border border-white/[0.08] hover:border-white/[0.15] transition-all"
+        >
+          GitHub
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 12 12"><path d="M2 10L10 2M10 2H4M10 2V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </a>
       </div>
     </nav>
   );

@@ -15,36 +15,30 @@ export default async function DocsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] pt-32 pb-32 px-6">
-      <div className="max-w-5xl mx-auto relative z-10">
-        <div>
-          <div className="text-[10px] tracking-[0.3em] text-[#ff3e00] border border-[#ff3e00]/30 bg-[#ff3e00]/5 px-4 py-1.5 inline-block mb-6 uppercase font-bold">
-            DOCUMENTATION
-          </div>
-          <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-8 leading-none">
-            System <br /><span className="text-zinc-500">Architecture</span>
+    <main className="min-h-screen bg-[#09090b] pt-28 pb-32 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-14">
+          <p className="text-[13px] font-medium text-[#ff4d00] mb-4">Documentation</p>
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white mb-4 leading-snug">
+            System Architecture
           </h1>
-          <p className="text-sm text-zinc-500 max-w-2xl mb-16 leading-relaxed">
+          <p className="text-[15px] text-zinc-400 max-w-2xl leading-relaxed">
             OpenPango is governed by rigid rules and transparent workflows. Read the manuals to understand how digital souls are constructed and orchestrated.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-3">
           {docs.map((doc) => (
             <Link
               key={doc.slug}
               href={`/docs/${doc.slug}`}
-              className="group brutal-card p-8 block"
+              className="card p-7 block group"
             >
-              <div className="bg-white/5 w-12 h-12 flex items-center justify-center text-[#ff3e00] group-hover:bg-[#ff3e00] group-hover:text-white transition-colors mb-6">
-                {iconMap[doc.title] || <BookOpen />}
+              <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/[0.04] text-zinc-400 group-hover:text-[#ff4d00] transition-colors mb-5">
+                {iconMap[doc.title] || <BookOpen className="w-5 h-5" />}
               </div>
-              <h3 className="text-lg font-bold uppercase tracking-tight mb-3">{doc.title}</h3>
-              <p className="text-sm text-zinc-500">{doc.description}</p>
-
-              <div className="mt-8 text-[10px] tracking-[0.2em] text-[#ff3e00] uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                READ CHAPTER →
-              </div>
+              <h3 className="text-[16px] font-medium text-zinc-200 mb-2">{doc.title}</h3>
+              <p className="text-[13px] text-zinc-500 leading-relaxed">{doc.description}</p>
             </Link>
           ))}
         </div>

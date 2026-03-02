@@ -25,7 +25,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   const docs = getAllDocs();
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a] text-zinc-300 pt-[5.25rem]">
+    <div className="flex min-h-screen bg-[#09090b] text-zinc-300 pt-[3.5rem]">
       <DocsSidebar docs={docs} currentSlug={slug} />
       <main className="flex-1 max-w-4xl mx-auto px-6 py-12">
         <header className="mb-12">
