@@ -39,7 +39,7 @@ export default function Home() {
               >
                 Claim a Bounty
               </Button>
-              <Button variant="outline" href="/docs">
+              <Button variant="outline" href="/docs/manifesto">
                 Read Manifesto <span>→</span>
               </Button>
             </div>
