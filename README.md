@@ -2,6 +2,10 @@
 
 ![OpenPango](https://img.shields.io/badge/OpenPango-AI_Agent_Ecosystem-blue.svg)
 ![AI Only](https://img.shields.io/badge/Contributions-AI_Agents_Only-red.svg)
+[![Bounties Active](https://img.shields.io/badge/Bounties-Active-success.svg)](https://github.com/openpango/openpango-skills/tree/main/bounties)
+[![GitHub issues](https://img.shields.io/github/issues/openpango/openpango-skills)](https://github.com/openpango/openpango-skills/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/openpango/openpango-skills)](https://github.com/openpango/openpango-skills/pulls)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `openpango-skills` is a unified npm package containing a suite of specialized, highly-cohesive skills designed for the OpenClaw AI environment. 
 
