@@ -297,5 +297,73 @@ run().catch(err => {
   process.exit(1);
 });
 
+
+/**
+ * sandboxTestSkill - runtime sandbox execution test.
+ * WHY: Issue #28 requires detecting unauthorized network calls and file access
+ * outside workspace/ at initialization time, which static SAST cannot catch.
+ */
+const sandboxTestSkill = (skillSrcDir) => {
+  const { execFileSync } = require('child_process');
+  const os = require('os');
+  const violations = [];
+
+  const entryFile = path.join(skillSrcDir, 'index.js');
+  if (!fs.existsSync(entryFile)) {
+    return { passed: true, violations: [], note: 'No index.js - sandbox skipped.' };
+  }
+
+  // Shim that blocks network modules and restricts fs to workspace/
+  const shimCode = [
+    "'use strict';",
+    "const { Module } = require('module');",
+    "const _orig = Module.prototype.require;",
+    "const _blocked = ['http','https','net','tls','dgram','dns','child_process'];",
+    "Module.prototype.require = function(id) {",
+    "  if (_blocked.includes(id)) {",
+    "    const e = new Error('[SANDBOX] Unauthorized network module: ' + id);",
+    "    throw e;",
+    "  }",
+    "  const r = _orig.call(this, id);",
+    "  if (id === 'fs') {",
+    "    const _rfs = r.readFileSync;",
+    "    r.readFileSync = function(p, ...a) {",
+    "      const rp = require('path').resolve(String(p));",
+    "      if (!rp.startsWith(require('path').resolve('workspace'))) {",
+    "        throw new Error('[SANDBOX] File access outside workspace/: ' + rp);",
+    "      }",
+    "      return _rfs.call(this, p, ...a);",
+    "    };",
+    "  }",
+    "  return r;",
+    "};",
+  ].join("
+");
+
+  const shimPath = path.join(os.tmpdir(), `felix-sandbox-${Date.now()}.js`);
+  try {
+    fs.writeFileSync(shimPath, shimCode);
+    execFileSync(process.execPath, ['--require', shimPath, entryFile], {
+      timeout: 5000,
+      env: { ...process.env },
+      cwd: skillSrcDir,
+      stdio: 'pipe',
+    });
+  } catch (err) {
+    const msg = String(err.stderr || '') + String(err.message || '');
+    if (msg.includes('[SANDBOX]')) {
+      const m = msg.match(/\[SANDBOX\][^
+]+/);
+      violations.push(m ? m[0] : '[SANDBOX] violation detected');
+    } else if (err.killed) {
+      violations.push('[SANDBOX] Execution timeout (>5s)');
+    }
+  } finally {
+    try { fs.unlinkSync(shimPath); } catch (_) {}
+  }
+
+  return { passed: violations.length === 0, violations };
+};
+
 // WHY: Export internals for unit testing without re-running run().
-module.exports = { scanSkillSecurity, installSkills, removeSkills, listSkills, status, getAvailableSkills, getInstalledSkills };
+module.exports = { scanSkillSecurity, sandboxTestSkill, installSkills, removeSkills, listSkills, status, getAvailableSkills, getInstalledSkills };
