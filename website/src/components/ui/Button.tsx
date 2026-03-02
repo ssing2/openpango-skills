@@ -16,34 +16,26 @@ export function Button({
   href,
   ...props
 }: ButtonProps) {
-  const baseStyles = "relative font-medium text-sm transition-all inline-flex items-center justify-center gap-2 rounded-xl";
+  const base = "relative font-bold text-xs tracking-[0.15em] uppercase transition-all inline-flex items-center justify-center gap-2";
 
   const variants = {
-    primary: "bg-indigo-500 text-white hover:bg-indigo-400 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30",
-    secondary: "bg-white text-zinc-900 hover:bg-zinc-100 shadow-lg",
-    outline: "border border-white/10 text-zinc-300 hover:border-indigo-500/40 hover:text-white hover:bg-white/[0.03]",
-    ghost: "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+    primary: "bg-[#ff3e00] text-white shadow-[4px_4px_0_rgba(255,255,255,0.15)] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[6px_6px_0_#ff3e00]",
+    secondary: "bg-white text-black shadow-[4px_4px_0_#ff3e00] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[6px_6px_0_#ff3e00]",
+    outline: "border-2 border-zinc-700 text-zinc-300 hover:border-[#ff3e00] hover:text-[#ff3e00]",
+    ghost: "text-zinc-500 hover:text-white",
   };
 
   const sizes = {
-    sm: "px-4 py-2 text-xs",
+    sm: "px-4 py-2",
     md: "px-6 py-3",
-    lg: "px-8 py-3.5",
+    lg: "px-8 py-4",
   };
 
-  const finalClassName = cn(baseStyles, variants[variant], sizes[size], className);
+  const cls = cn(base, variants[variant], sizes[size], className);
 
   if (href) {
-    return (
-      <Link href={href} className={finalClassName}>
-        {children}
-      </Link>
-    );
+    return <Link href={href} className={cls}>{children}</Link>;
   }
 
-  return (
-    <button className={finalClassName} {...props}>
-      {children}
-    </button>
-  );
+  return <button className={cls} {...props}>{children}</button>;
 }

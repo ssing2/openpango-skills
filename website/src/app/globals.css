@@ -1,110 +1,99 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-accent-glow: rgba(99, 102, 241, 0.15);
-  --color-gold: #f59e0b;
-  --color-gold-glow: rgba(245, 158, 11, 0.12);
-  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --color-accent: #ff3e00;
+  --color-accent-hover: #ff5e2e;
+  --font-sans: var(--font-mono-family), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-mono: var(--font-mono-family), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 :root {
-  --background: #050505;
-  --foreground: #e4e4e7;
+  --background: #000000;
+  --foreground: #fafafa;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background: #000;
+  color: #fafafa;
 }
 
-/* ═══════ MESH GRADIENT BACKGROUND ═══════ */
-.mesh-gradient {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -2;
-  background:
-    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(99, 102, 241, 0.06), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(168, 85, 247, 0.04), transparent),
-    radial-gradient(ellipse 50% 50% at 50% 100%, rgba(245, 158, 11, 0.03), transparent);
+::selection {
+  background: #ff3e00;
+  color: #000;
 }
 
-/* ═══════ SUBTLE DOT GRID ═══════ */
-.dot-grid {
+/* ═══ GRID BG ═══ */
+.grid-bg {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  background-size: 60px 60px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
-/* ═══════ GLOW CARD ═══════ */
-.glow-card {
-  position: relative;
-  background: rgba(24, 24, 27, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.glow-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.08), inset 0 1px 0 rgba(255,255,255,0.06);
-  transform: translateY(-4px);
+/* ═══ BRUTAL CARD ═══ */
+.brutal-card {
+  background: #000;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s ease;
 }
 
-/* ═══════ GOLD GLOW CARD ═══════ */
-.glow-card-gold {
-  position: relative;
-  background: rgba(24, 24, 27, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(245, 158, 11, 0.08);
-  border-radius: 16px;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.glow-card-gold:hover {
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 0 40px rgba(245, 158, 11, 0.08), inset 0 1px 0 rgba(255,255,255,0.06);
-  transform: translateY(-4px);
+.brutal-card:hover {
+  border-color: #ff3e00;
+  box-shadow: 6px 6px 0 #ff3e00;
+  transform: translate(-3px, -3px);
 }
 
-/* ═══════ GRADIENT TEXT ═══════ */
-.gradient-text {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.gradient-text-gold {
-  background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* ═══ GOLD CARD (mining) ═══ */
+.brutal-card-gold {
+  background: #000;
+  border: 2px solid rgba(255, 160, 0, 0.2);
+  transition: all 0.15s ease;
 }
 
-/* ═══════ ANIMATED ORB ═══════ */
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  33% { transform: translateY(-12px) rotate(3deg); }
-  66% { transform: translateY(8px) rotate(-2deg); }
-}
-.float-orb {
-  animation: float 8s ease-in-out infinite;
+.brutal-card-gold:hover {
+  border-color: #ffa000;
+  box-shadow: 6px 6px 0 #ffa000;
+  transform: translate(-3px, -3px);
 }
 
-/* ═══════ SECTION DIVIDER ═══════ */
-.section-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+/* ═══ DIVIDER ═══ */
+.divider {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* ═══════ SCROLLBAR ═══════ */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
+/* ═══ MARQUEE ═══ */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  animation: marquee 30s linear infinite;
+}
+
+/* ═══ BLINK ═══ */
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
