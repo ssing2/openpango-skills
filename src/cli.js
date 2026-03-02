@@ -190,25 +190,242 @@ const listSkills = () => {
   });
 };
 
-// WHY: status() was cut off in the original file — completing it here.
-const status = () => {
-  const installed = getInstalledSkills();
-  console.log('Installed skills status:');
-  if (installed.length === 0) {
-    console.log('  No skills installed.');
-    return;
+// ---------------------------------------------------------------------------
+// Health Check System (Bounty #6)
+// WHY: Comprehensive status command that validates workspace, symlinks,
+// and runs skill-specific health checks with color-coded terminal output.
+// ---------------------------------------------------------------------------
+
+// ANSI color helpers — avoids chalk dependency for zero-install portability.
+const c = {
+  green: (s) => `\x1b[32m${s}\x1b[0m`,
+  red: (s) => `\x1b[31m${s}\x1b[0m`,
+  yellow: (s) => `\x1b[33m${s}\x1b[0m`,
+  cyan: (s) => `\x1b[36m${s}\x1b[0m`,
+  dim: (s) => `\x1b[2m${s}\x1b[0m`,
+  bold: (s) => `\x1b[1m${s}\x1b[0m`,
+};
+
+const OK = c.green('✓');
+const FAIL = c.red('✗');
+const WARN = c.yellow('⚠');
+
+// Check workspace structure at ~/.openclaw/workspace/
+const checkWorkspace = () => {
+  const results = [];
+  const workspaceDir = path.join(OPENCLAW_DIR, 'workspace');
+  const requiredFiles = ['AGENTS.md', 'TOOLS.md'];
+  const requiredDirs = ['.learnings'];
+
+  if (!fs.existsSync(workspaceDir)) {
+    results.push({ ok: false, msg: 'Workspace directory missing — run openpango init' });
+    return results;
   }
-  installed.forEach(skill => {
-    const destDir = path.join(SKILLS_DIR, skill);
-    const isValid = fs.existsSync(path.join(destDir, 'SKILL.md'));
-    // WHY: Also verify the symlink target still exists (detect post-install tampering).
-    let linkTarget = null;
-    try {
-      linkTarget = fs.realpathSync(destDir);
-    } catch (_) { }
-    const targetExists = linkTarget && fs.existsSync(linkTarget);
-    console.log(`  - ${skill}: ${isValid && targetExists ? 'OK' : 'Broken'}`);
+  results.push({ ok: true, msg: `Workspace exists ${c.dim(workspaceDir)}` });
+
+  requiredFiles.forEach(file => {
+    const p = path.join(workspaceDir, file);
+    results.push({
+      ok: fs.existsSync(p),
+      msg: fs.existsSync(p)
+        ? `${file} present`
+        : `${file} missing — run openpango init`,
+    });
   });
+
+  requiredDirs.forEach(dir => {
+    const p = path.join(workspaceDir, dir);
+    results.push({
+      ok: fs.existsSync(p),
+      msg: fs.existsSync(p)
+        ? `${dir}/ present`
+        : `${dir}/ missing`,
+    });
+  });
+
+  return results;
+};
+
+// Skill-specific health probes
+const skillHealthChecks = {
+  browser: (skillDir) => {
+    const results = [];
+    // Check daemon script exists
+    const daemon = path.join(skillDir, 'browser_daemon.py');
+    results.push({
+      ok: fs.existsSync(daemon),
+      msg: fs.existsSync(daemon) ? 'browser_daemon.py found' : 'browser_daemon.py missing',
+    });
+
+    // Check if Playwright daemon is responsive (port 9222 or a PID file)
+    const dataDir = path.join(skillDir, '.browser_data');
+    if (fs.existsSync(dataDir)) {
+      results.push({ ok: true, msg: `.browser_data/ present ${c.dim('(persistent state)')}` });
+    } else {
+      results.push({ ok: true, msg: `.browser_data/ not created yet ${c.dim('(normal before first run)')}`, warn: true });
+    }
+
+    // Try to detect running daemon
+    try {
+      const { execSync: exec } = require('child_process');
+      const pgrep = exec('pgrep -f browser_daemon.py 2>/dev/null', { stdio: 'pipe' }).toString().trim();
+      if (pgrep) {
+        results.push({ ok: true, msg: `Daemon running ${c.dim(`PID ${pgrep.split('\\n')[0]}`)}` });
+      } else {
+        results.push({ ok: true, msg: `Daemon not running ${c.dim('(start with: python3 skills/browser/browser_daemon.py &)')}`, warn: true });
+      }
+    } catch (_) {
+      results.push({ ok: true, msg: `Daemon not running ${c.dim('(start manually when needed)')}`, warn: true });
+    }
+
+    return results;
+  },
+
+  memory: (skillDir) => {
+    const results = [];
+    const manager = path.join(skillDir, 'memory_manager.py');
+    results.push({
+      ok: fs.existsSync(manager),
+      msg: fs.existsSync(manager) ? 'memory_manager.py found' : 'memory_manager.py missing',
+    });
+
+    // Check for JSONL event log
+    const workspaceDir = path.join(OPENCLAW_DIR, 'workspace');
+    const jsonlFiles = [];
+    try {
+      const files = fs.readdirSync(workspaceDir);
+      files.forEach(f => { if (f.endsWith('.jsonl')) jsonlFiles.push(f); });
+    } catch (_) { }
+
+    if (jsonlFiles.length > 0) {
+      results.push({ ok: true, msg: `Event log(s) found: ${jsonlFiles.join(', ')}` });
+    } else {
+      results.push({ ok: true, msg: `No event logs yet ${c.dim('(normal before first use)')}`, warn: true });
+    }
+
+    // Check SQLite cache
+    const dbFiles = [];
+    try {
+      const files = fs.readdirSync(workspaceDir);
+      files.forEach(f => { if (f.endsWith('.db') || f.endsWith('.sqlite')) dbFiles.push(f); });
+    } catch (_) { }
+
+    if (dbFiles.length > 0) {
+      results.push({ ok: true, msg: `SQLite cache found: ${dbFiles.join(', ')}` });
+    } else {
+      results.push({ ok: true, msg: `No SQLite cache yet ${c.dim('(rebuilt automatically on first query)')}`, warn: true });
+    }
+
+    return results;
+  },
+
+  orchestration: (skillDir) => {
+    const results = [];
+    const router = path.join(skillDir, 'router.py');
+    results.push({
+      ok: fs.existsSync(router),
+      msg: fs.existsSync(router) ? 'router.py found' : 'router.py missing',
+    });
+
+    // Check for Python3 availability
+    try {
+      const { execSync: exec } = require('child_process');
+      const pyVer = exec('python3 --version 2>&1', { stdio: 'pipe' }).toString().trim();
+      results.push({ ok: true, msg: `Python runtime: ${pyVer}` });
+    } catch (_) {
+      results.push({ ok: false, msg: 'Python3 not found — required for orchestration' });
+    }
+
+    return results;
+  },
+
+  'self-improvement': (skillDir) => {
+    const results = [];
+    const updater = path.join(skillDir, 'skill_updater.py');
+    const hasUpdater = fs.existsSync(updater);
+    results.push({
+      ok: hasUpdater,
+      msg: hasUpdater ? 'skill_updater.py found' : 'skill_updater.py not found',
+    });
+
+    // Check learnings directory
+    const learningsDir = path.join(OPENCLAW_DIR, 'workspace', '.learnings');
+    if (fs.existsSync(learningsDir)) {
+      const count = fs.readdirSync(learningsDir).length;
+      results.push({ ok: true, msg: `Learnings directory: ${count} entries` });
+    } else {
+      results.push({ ok: true, msg: 'No learnings recorded yet', warn: true });
+    }
+
+    return results;
+  },
+};
+
+const status = () => {
+  console.log('');
+  console.log(c.bold('  ╔══════════════════════════════════════════╗'));
+  console.log(c.bold('  ║     🦔 OpenPango Health Check            ║'));
+  console.log(c.bold('  ╚══════════════════════════════════════════╝'));
+  console.log('');
+
+  // --- 1. Workspace Health ---
+  console.log(c.bold(c.cyan('  ┌─ Workspace')));
+  const wsResults = checkWorkspace();
+  wsResults.forEach(r => {
+    const icon = r.ok ? (r.warn ? WARN : OK) : FAIL;
+    console.log(`  │  ${icon} ${r.msg}`);
+  });
+  console.log(c.dim('  │'));
+
+  // --- 2. Installed Skills ---
+  const installed = getInstalledSkills();
+  console.log(c.bold(c.cyan('  ├─ Skills')));
+
+  if (installed.length === 0) {
+    console.log(`  │  ${WARN} No skills installed.`);
+    console.log(c.dim('  │    Run: openpango install browser memory orchestration'));
+  } else {
+    installed.forEach(skill => {
+      const destDir = path.join(SKILLS_DIR, skill);
+      const hasSkillMd = fs.existsSync(path.join(destDir, 'SKILL.md'));
+
+      // Symlink check
+      let linkOk = false;
+      try {
+        const target = fs.realpathSync(destDir);
+        linkOk = fs.existsSync(target);
+      } catch (_) { }
+
+      const overallOk = hasSkillMd && linkOk;
+      const icon = overallOk ? OK : FAIL;
+      const statusLabel = overallOk ? c.green('OK') : c.red('BROKEN');
+      console.log(`  │  ${icon} ${c.bold(skill)} ${c.dim('—')} ${statusLabel}`);
+
+      // Run skill-specific health checks if available
+      if (overallOk && skillHealthChecks[skill]) {
+        const checks = skillHealthChecks[skill](destDir);
+        checks.forEach(check => {
+          const ci = check.ok ? (check.warn ? WARN : OK) : FAIL;
+          console.log(`  │     ${ci} ${c.dim(check.msg)}`);
+        });
+      }
+    });
+  }
+
+  console.log(c.dim('  │'));
+
+  // --- 3. Summary ---
+  const totalOk = installed.filter(s => {
+    const d = path.join(SKILLS_DIR, s);
+    try { return fs.existsSync(path.join(d, 'SKILL.md')) && fs.existsSync(fs.realpathSync(d)); }
+    catch (_) { return false; }
+  }).length;
+  const wsOk = wsResults.every(r => r.ok);
+
+  console.log(c.bold(c.cyan('  └─ Summary')));
+  console.log(`     Skills: ${c.bold(totalOk + '/' + installed.length)} healthy`);
+  console.log(`     Workspace: ${wsOk ? c.green('Nominal') : c.red('Issues detected')}`);
+  console.log('');
 };
 
 const interactiveInstall = async (opts = {}) => {

@@ -306,9 +306,10 @@ describe('Skill Lifecycle', () => {
         cli.status();
 
         const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
-        expect(output).toContain('Installed skills status');
+        expect(output).toContain('Health Check');
+        expect(output).toContain('Summary');
         // Output should mention either specific skills or 'No skills installed'
-        const hasSkills = output.includes('OK') || output.includes('Broken');
+        const hasSkills = output.includes('OK') || output.includes('BROKEN');
         const noSkills = output.includes('No skills installed');
         expect(hasSkills || noSkills).toBe(true);
 
@@ -386,6 +387,7 @@ describe('CLI Smoke Tests', () => {
         });
 
         const stdout = result.toString();
-        expect(stdout).toContain('Installed skills status');
+        expect(stdout).toContain('Health Check');
+        expect(stdout).toContain('Summary');
     });
 });
