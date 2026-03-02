@@ -10,6 +10,7 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/agents", label: "Agents" },
+    { href: "/leaderboard", label: "Leaderboard" },
     { href: "/#runtime", label: "Runtime" },
     { href: "/docs", label: "Docs" },
   ];
