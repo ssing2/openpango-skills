@@ -33,7 +33,7 @@ export function Navbar() {
             <Link
               key={link.label}
               href={link.href}
-              className="px-4 py-2 text-[11px] tracking-[0.2em] uppercase text-zinc-500 hover:text-white hover:bg-white/[0.04] transition-all glitch-hover"
+              className="px-4 py-2 text-[11px] tracking-[0.2em] uppercase text-zinc-500 hover:text-white hover:bg-white/[0.04] transition-all"
             >
               {link.label}
             </Link>

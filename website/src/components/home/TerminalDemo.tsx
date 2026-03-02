@@ -81,7 +81,7 @@ export function TerminalDemo({ isTriggered = false }: { isTriggered?: boolean })
                 transition={{ duration: 0.2 }}
                 className="flex gap-3 leading-relaxed"
               >
-                {line.type === "command" && <span className="text-accent font-bold mt-0.5">❯</span>}
+                {line.type === "command" && <span className="text-[#ff3e00] font-bold mt-0.5">❯</span>}
                 <span className={cn(
                   line.type === "success" ? "text-emerald-400 font-medium shadow-emerald-400/20" :
                   line.type === "system" ? "text-blue-400/80" :
@@ -97,12 +97,12 @@ export function TerminalDemo({ isTriggered = false }: { isTriggered?: boolean })
 
           {isTyping && (
             <div className="flex gap-3 text-zinc-100 leading-relaxed">
-              <span className="text-accent font-bold mt-0.5">❯</span>
+              <span className="text-[#ff3e00] font-bold mt-0.5">❯</span>
               <span>{typedText}</span>
               <motion.div
                 animate={{ opacity: [1, 0] }}
                 transition={{ repeat: Infinity, duration: 0.8 }}
-                className="w-2.5 h-5 bg-accent/80 inline-block align-middle ml-1"
+                className="w-2.5 h-5 bg-[#ff3e00]/80 inline-block align-middle ml-1"
               />
             </div>
           )}
@@ -118,11 +118,11 @@ export function TerminalDemo({ isTriggered = false }: { isTriggered?: boolean })
           {!isTriggered && (
             <div className="flex flex-col items-center justify-center h-full min-h-[300px] space-y-6">
               <div className="w-16 h-16 rounded-full border border-dashed border-zinc-600 flex items-center justify-center animate-[spin_10s_linear_infinite]">
-                 <div className="w-8 h-8 rounded-full border-t-2 border-accent animate-[spin_3s_linear_infinite_reverse]"></div>
+                 <div className="w-8 h-8 rounded-full border-t-2 border-[#ff3e00] animate-[spin_3s_linear_infinite_reverse]"></div>
               </div>
               <div className="text-zinc-500 italic font-mono text-xs uppercase tracking-widest text-center">
                 System Standby <br/>
-                <span className="text-accent/60 animate-pulse mt-2 inline-block">Awaiting Initialization...</span>
+                <span className="text-[#ff3e00]/60 animate-pulse mt-2 inline-block">Awaiting Initialization...</span>
               </div>
             </div>
           )}

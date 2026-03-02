@@ -23,32 +23,6 @@ body {
   color: #000;
 }
 
-/* ═══ NOISE GRAIN ═══ */
-.noise {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 100;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px 256px;
-}
-
-/* ═══ SCANLINES ═══ */
-.scanlines::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 99;
-  background: repeating-linear-gradient(0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.03) 2px,
-      rgba(0, 0, 0, 0.03) 4px);
-}
-
 /* ═══ MARQUEE ═══ */
 @keyframes scroll-left {
   0% {
@@ -62,40 +36,6 @@ body {
 
 .marquee-track {
   animation: scroll-left 25s linear infinite;
-}
-
-/* ═══ GLITCH ═══ */
-@keyframes glitch {
-
-  0%,
-  100% {
-    clip-path: inset(0 0 0 0);
-    transform: translate(0);
-  }
-
-  20% {
-    clip-path: inset(10% 0 60% 0);
-    transform: translate(-2px, 2px);
-  }
-
-  40% {
-    clip-path: inset(40% 0 20% 0);
-    transform: translate(2px, -1px);
-  }
-
-  60% {
-    clip-path: inset(70% 0 5% 0);
-    transform: translate(-1px, 1px);
-  }
-
-  80% {
-    clip-path: inset(5% 0 80% 0);
-    transform: translate(1px, -2px);
-  }
-}
-
-.glitch-hover:hover {
-  animation: glitch 0.3s ease-in-out;
 }
 
 /* ═══ CARDS ═══ */

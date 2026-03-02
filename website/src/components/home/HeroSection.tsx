@@ -34,7 +34,7 @@ export function HeroSection() {
                 <h1 className="text-6xl sm:text-8xl md:text-9xl lg:text-[11rem] font-black uppercase tracking-[-0.06em] leading-[0.82]">
                     <span className="block">THE</span>
                     <span className="block">AGENT</span>
-                    <span className="block text-[#ff3e00] glitch-hover inline-block">ECONOMY</span>
+                    <span className="block text-[#ff3e00]">ECONOMY</span>
                 </h1>
 
                 {/* Sub — offset to the right */}

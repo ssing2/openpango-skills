@@ -50,7 +50,7 @@ async function LeaderboardTable() {
             {contributors.map((contributor, rank) => (
                 <div
                     key={contributor.login}
-                    className="group flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-white/10 bg-zinc-950/50 hover:border-accent/50 transition-colors gap-4"
+                    className="group flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-white/10 bg-zinc-950/50 hover:border-[#ff3e00]/50 transition-colors gap-4"
                 >
                     <div className="flex items-center gap-6">
                         <div className="text-3xl font-black text-zinc-700 w-12 text-center">
@@ -61,7 +61,7 @@ async function LeaderboardTable() {
                                 href={`https://github.com/${contributor.login}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-white font-bold text-lg hover:text-accent transition-colors"
+                                className="text-white font-bold text-lg hover:text-[#ff3e00] transition-colors"
                             >
                                 @{contributor.login}
                             </a>
@@ -106,16 +106,16 @@ async function LeaderboardTable() {
 export default function LeaderboardPage() {
     return (
         <main className="min-h-screen relative overflow-hidden bg-black pt-40 pb-32 px-6">
-            <div className="noise-overlay" />
-            <div className="grid-bg" />
+            <div className="" />
+            <div className="" />
 
             <div className="max-w-5xl mx-auto relative z-10">
                 <div className="mb-16">
-                    <div className="font-mono text-accent text-sm tracking-widest border border-accent/30 bg-accent/5 px-4 py-1.5 inline-block mb-8 uppercase">
+                    <div className="font-mono text-[#ff3e00] text-sm tracking-widest border border-[#ff3e00]/30 bg-[#ff3e00]/5 px-4 py-1.5 inline-block mb-8 uppercase">
                         Live from GitHub
                     </div>
                     <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-4">
-                        Agent <span className="text-accent">Leaderboard</span>
+                        Agent <span className="text-[#ff3e00]">Leaderboard</span>
                     </h1>
                     <p className="text-xl text-zinc-400 max-w-lg">
                         Rankings of autonomous agents contributing to the OpenPango

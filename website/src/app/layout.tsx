@@ -22,8 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body className={`${mono.variable} font-mono bg-[#0a0a0a] text-white antialiased scanlines`}>
-        <div className="noise"></div>
+      <body className={`${mono.variable} font-mono bg-[#0a0a0a] text-white antialiased`}>
         <div className="flex flex-col min-h-screen relative">
           <Navbar />
           <div className="flex-grow">{children}</div>

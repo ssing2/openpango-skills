@@ -15,38 +15,35 @@ export default async function DocsPage() {
   };
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-black pt-40 pb-32 px-6">
-      <div className="noise-overlay"></div>
-      <div className="grid-bg"></div>
-
+    <main className="min-h-screen bg-[#0a0a0a] pt-32 pb-32 px-6">
       <div className="max-w-5xl mx-auto relative z-10">
         <div>
-          <div className="font-mono text-accent text-sm tracking-widest border border-accent/30 bg-accent/5 px-4 py-1.5 inline-block mb-6 uppercase">
+          <div className="text-[10px] tracking-[0.3em] text-[#ff3e00] border border-[#ff3e00]/30 bg-[#ff3e00]/5 px-4 py-1.5 inline-block mb-6 uppercase font-bold">
             DOCUMENTATION
           </div>
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-8 leading-none">
             System <br /><span className="text-zinc-500">Architecture</span>
           </h1>
-          <p className="text-xl text-zinc-400 max-w-2xl mb-16 leading-relaxed">
+          <p className="text-sm text-zinc-500 max-w-2xl mb-16 leading-relaxed">
             OpenPango is governed by rigid rules and transparent workflows. Read the manuals to understand how digital souls are constructed and orchestrated.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4">
           {docs.map((doc) => (
             <Link
               key={doc.slug}
               href={`/docs/${doc.slug}`}
-              className="group glow-border rounded-xl bg-zinc-900/40 p-8 border border-white/5 hover:bg-zinc-900/80 transition-all cursor-pointer block"
+              className="group brutal-card p-8 block"
             >
-              <div className="bg-white/5 w-12 h-12 flex items-center justify-center rounded-lg text-accent group-hover:bg-accent group-hover:text-white transition-colors mb-6">
+              <div className="bg-white/5 w-12 h-12 flex items-center justify-center text-[#ff3e00] group-hover:bg-[#ff3e00] group-hover:text-white transition-colors mb-6">
                 {iconMap[doc.title] || <BookOpen />}
               </div>
-              <h3 className="text-2xl font-bold uppercase tracking-tight mb-3">{doc.title}</h3>
-              <p className="text-zinc-400">{doc.description}</p>
+              <h3 className="text-lg font-bold uppercase tracking-tight mb-3">{doc.title}</h3>
+              <p className="text-sm text-zinc-500">{doc.description}</p>
 
-              <div className="mt-8 font-mono text-xs text-accent uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                Read Chapter <span className="animate-pulse">_</span>
+              <div className="mt-8 text-[10px] tracking-[0.2em] text-[#ff3e00] uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                READ CHAPTER →
               </div>
             </Link>
           ))}

@@ -13,7 +13,7 @@ export async function generateStaticParams() {
 
 export default async function DocPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  
+
   let doc;
   try {
     doc = getDocBySlug(slug);
@@ -25,7 +25,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   const docs = getAllDocs();
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-300">
+    <div className="flex min-h-screen bg-[#0a0a0a] text-zinc-300 pt-[5.25rem]">
       <DocsSidebar docs={docs} currentSlug={slug} />
       <main className="flex-1 max-w-4xl mx-auto px-6 py-12">
         <header className="mb-12">

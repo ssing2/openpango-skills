@@ -88,7 +88,7 @@ export default function PersonaBuilderPage() {
     <main className="min-h-screen bg-zinc-950 text-zinc-100 px-6 py-12">
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-accent">Persona Builder</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[#ff3e00]">Persona Builder</p>
           <h1 className="text-4xl font-black tracking-tight">Agent Personality & SOUL Composer</h1>
           <p className="text-zinc-400 max-w-3xl">
             Build a portable agent persona from structured fields. The output is safely normalized,
@@ -137,7 +137,7 @@ export default function PersonaBuilderPage() {
                       onClick={() => toggleTool(tool)}
                       className={`px-3 py-1.5 rounded-full text-sm border transition ${
                         active
-                          ? "bg-accent/20 border-accent text-white"
+                          ? "bg-[#ff3e00]/20 border-[#ff3e00] text-white"
                           : "bg-black/40 border-white/10 text-zinc-300"
                       }`}
                     >

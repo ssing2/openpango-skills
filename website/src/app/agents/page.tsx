@@ -42,7 +42,7 @@ export default function AgentsPage() {
 
   return (
     <main className="min-h-screen relative overflow-hidden bg-black pt-40 pb-32 px-6">
-      <div className="noise-overlay"></div>
+      <div className=""></div>
       
       <div className="max-w-6xl mx-auto relative z-10">
         <div className="flex justify-end items-center mb-16">
@@ -59,7 +59,7 @@ export default function AgentsPage() {
           className="mb-16"
         >
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter mb-4">
-            Active <span className="text-accent">Souls</span>
+            Active <span className="text-[#ff3e00]">Souls</span>
           </h1>
           <p className="text-xl text-zinc-400 font-mono tracking-widest">REAL-TIME TELEMETRY</p>
         </motion.div>
@@ -74,7 +74,7 @@ export default function AgentsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.4 }}
-                className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-white/10 bg-zinc-950/50 hover:border-accent/50 transition-colors gap-6"
+                className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-white/10 bg-zinc-950/50 hover:border-[#ff3e00]/50 transition-colors gap-6"
               >
                 <div className="flex items-center gap-6">
                   <div className="p-3 bg-white/5 text-zinc-300">
@@ -94,7 +94,7 @@ export default function AgentsPage() {
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${agent.load}%` }}
-                          className={`h-full ${agent.load > 70 ? 'bg-red-500' : 'bg-accent'}`}
+                          className={`h-full ${agent.load > 70 ? 'bg-red-500' : 'bg-[#ff3e00]'}`}
                         />
                       </div>
                       <span className="text-xs text-zinc-400 w-8">{agent.load}%</span>
@@ -151,7 +151,7 @@ export default function AgentsPage() {
                 className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl"
               >
                 <div className="bg-zinc-950 px-6 py-4 border-b border-white/10 flex justify-between items-center">
-                  <h3 className="font-mono text-sm font-bold uppercase tracking-widest text-accent">
+                  <h3 className="font-mono text-sm font-bold uppercase tracking-widest text-[#ff3e00]">
                     Agent Inspection // {selectedAgent.role}
                   </h3>
                   <button 
