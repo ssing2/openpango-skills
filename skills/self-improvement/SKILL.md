@@ -1,5 +1,5 @@
 ---
-version: 1.0.0
+version: 1.1.0
 name: self-improvement
 description: "Captures learnings, proposes self-updates via git, and coordinates ecosystem growth."
 user-invocable: true
@@ -21,6 +21,40 @@ This skill empowers the agent to continuously improve by combining structured le
 ## Part A: Learnings Log
 
 Log learnings and errors to markdown files for continuous improvement. Coding agents can later process these into fixes, and important learnings get promoted to project memory.
+
+### CLI Tools
+
+#### `learnings_logger.py`
+Programmatically create structured log entries:
+
+```bash
+# Log an error
+python3 skills/self-improvement/learnings_logger.py log-error \
+  --summary "npm ERR! missing script: start" \
+  --area backend --priority high
+
+# Log a learning
+python3 skills/self-improvement/learnings_logger.py log-learning \
+  --summary "Use --force for stale lockfiles" \
+  --category best_practice --area infra
+
+# Log a feature request
+python3 skills/self-improvement/learnings_logger.py log-feature-request \
+  --summary "Add caching layer to API" \
+  --area backend --action "Implement Redis caching middleware"
+```
+
+#### `promote.py`
+Promote verified learnings to global config files:
+
+```bash
+python3 skills/self-improvement/promote.py \
+  --learning-id LRN-20260303-001 \
+  --target TOOLS.md \
+  --summary "Always use --force for stale lockfiles"
+```
+
+Valid targets: `AGENTS.md`, `SOUL.md`, `TOOLS.md`
 
 ### Quick Reference
 
