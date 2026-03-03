@@ -130,8 +130,8 @@ export async function fetchEcosystemStats(): Promise<EcosystemStats> {
             assignedBounties: assignedCount,
             completedBounties: allClosed.length,
             contributors: contributors.data.length,
-            totalSkills: 8,
-            totalTests: 20,
+            totalSkills: 30,
+            totalTests: 262,
         };
 
         setCache("stats", stats);
@@ -143,8 +143,8 @@ export async function fetchEcosystemStats(): Promise<EcosystemStats> {
             assignedBounties: 3,
             completedBounties: 3,
             contributors: 3,
-            totalSkills: 8,
-            totalTests: 20,
+            totalSkills: 30,
+            totalTests: 262,
         };
     }
 }

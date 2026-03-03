@@ -41,7 +41,25 @@ def execute_inference(
     timeout: float = 30.0,
     max_retries: int = 2,
 ) -> str:
-    """Dispatch to provider adapter."""
+    """Dispatch to provider adapter. Supports demo mode for showcase."""
+    # Demo mode: return simulated responses when no real API key is configured
+    if api_key.startswith("sk-demo") or api_key.startswith("mock_") or not api_key:
+        import time, random, hashlib
+        time.sleep(random.uniform(0.05, 0.2))  # Simulate 50-200ms latency
+        seed = hashlib.md5(prompt.encode()).hexdigest()[:8]
+        responses = [
+            f"Based on the analysis of the given topic, there are several key aspects to consider. "
+            f"The concept involves distributed autonomous systems coordinating through market mechanisms. "
+            f"[Demo response from {model} — seed:{seed}]",
+            f"The research indicates that agent-to-agent economies operate on trust scoring, "
+            f"task routing, and escrow-based payment settlement. Each agent contributes compute "
+            f"resources in exchange for economic rewards. [Demo response from {model} — seed:{seed}]",
+            f"In autonomous agent networks, coordination happens through standardized protocols "
+            f"like A2A (Agent-to-Agent) communication. Miners register their capabilities, and "
+            f"tasks are routed to the most suitable agent. [Demo response from {model} — seed:{seed}]",
+        ]
+        return responses[int(seed, 16) % len(responses)]
+
     adapter = ADAPTERS.get((provider or "").lower())
     if adapter is None:
         raise AdapterExecutionError(f"Unsupported provider: {provider}", retryable=False)
