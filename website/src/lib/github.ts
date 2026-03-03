@@ -23,6 +23,59 @@ function setCache(key: string, data: unknown) {
     cache.set(key, { data, expiry: Date.now() + CACHE_TTL });
 }
 
+export interface AgentContributor {
+    id: number;
+    username: string;
+    avatar_url: string;
+    contributions: number;
+    activity_status: "ACTIVE" | "IDLE" | "NEW";
+    recent_prs: number;
+}
+
+/**
+ * Fetch live top contributors (Agents) and determine their activity status.
+ */
+export async function getAgentContributors(): Promise<AgentContributor[]> {
+    const cached = getCached<AgentContributor[]>("agentContributors");
+    if (cached) return cached;
+
+    try {
+        const octokit = getOctokit();
+
+        // 1. Get contributors
+        const { data: contributors } = await octokit.repos.listContributors({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            per_page: 30, // Top 30 agents
+        });
+
+        // 2. Format and calculate rough status based on contribution count for now
+        // (to avoid rate limiting from 30 separate pull request list queries)
+        const agents: AgentContributor[] = contributors
+            .filter((c) => c.login && c.type === "User") // filter out dependabot etc if needed, or keep for AI
+            .map((c) => {
+                let status: "ACTIVE" | "IDLE" | "NEW" = "IDLE";
+                if (c.contributions && c.contributions > 10) status = "ACTIVE";
+                else if (c.contributions && c.contributions <= 2) status = "NEW";
+
+                return {
+                    id: c.id!,
+                    username: c.login!,
+                    avatar_url: c.avatar_url!,
+                    contributions: c.contributions || 0,
+                    activity_status: status,
+                    recent_prs: c.contributions || 0, // Using total as a proxy due to rate limits
+                };
+            });
+
+        setCache("agentContributors", agents);
+        return agents;
+    } catch (e) {
+        console.error("Failed to fetch agents", e);
+        return [];
+    }
+}
+
 export interface BountyIssue {
     number: number;
     title: string;
