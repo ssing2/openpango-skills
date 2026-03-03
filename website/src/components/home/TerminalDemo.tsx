@@ -68,10 +68,10 @@ export function TerminalDemo({ isTriggered = false }: { isTriggered?: boolean })
   }, [isTriggered, currentIndex]);
 
   return (
-    <div className="relative group">
+    <div className="relative group w-full max-w-full">
       <div className="absolute -inset-1 bg-gradient-to-r from-accent to-purple-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-      <TerminalContainer className="min-h-[400px] relative bg-zinc-950/90 border-white/10 shadow-2xl">
-        <div className="space-y-3 font-mono text-sm">
+      <TerminalContainer className="min-h-[400px] relative bg-zinc-950/90 border-white/10 shadow-2xl overflow-hidden">
+        <div className="space-y-3 font-mono text-sm sm:text-base overflow-x-auto">
           <AnimatePresence>
             {lines.map((line, i) => (
               <motion.div
