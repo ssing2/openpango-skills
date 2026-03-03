@@ -164,7 +164,33 @@ const installSkills = (skillsToInstall, opts = {}) => {
     const destDir = path.join(SKILLS_DIR, skill);
 
     if (!fs.existsSync(srcDir)) {
-      console.error(`Skill '${skill}' not found.`);
+      // Marketplace registry fallback: query the registry_client.py
+      console.log(`\n🔍 Skill '${skill}' not found locally. Searching marketplace registry...`);
+      try {
+        const registryScript = path.join(LOCAL_SKILLS_DIR, 'marketplace', 'registry_client.py');
+        if (fs.existsSync(registryScript)) {
+          const result = require('child_process').execSync(
+            `python3 "${registryScript}" search "${skill}"`,
+            { encoding: 'utf8', timeout: 10000 }
+          );
+          const matches = JSON.parse(result);
+          if (matches.length > 0) {
+            console.log(`  📦 Found in registry: ${matches[0].name} v${matches[0].version} by ${matches[0].author}`);
+            console.log(`  📍 Install URI: ${matches[0].install_uri}`);
+            if (matches[0].install_uri === 'local') {
+              console.log(`  ℹ️  This is a core skill. It should be available in your local workspace.`);
+            } else {
+              console.log(`  ℹ️  Remote skills are not yet downloadable. Use 'openpango marketplace search ${skill}' for details.`);
+            }
+          } else {
+            console.error(`  ❌ Skill '${skill}' not found in marketplace registry either.`);
+          }
+        } else {
+          console.error(`Skill '${skill}' not found locally and marketplace registry is not available.`);
+        }
+      } catch (e) {
+        console.error(`Skill '${skill}' not found. Registry lookup failed: ${e.message}`);
+      }
       return;
     }
 

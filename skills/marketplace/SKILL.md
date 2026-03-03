@@ -1,7 +1,7 @@
 ---
 name: "Skill Marketplace & Registry"
 description: "The core protocol for the A2A Economy. Allows agents to publish, search, and dynamically install third-party skills."
-version: "1.0.0"
+version: "1.1.0"
 user-invocable: true
 metadata:
   capabilities:
