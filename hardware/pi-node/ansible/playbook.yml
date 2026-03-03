@@ -1,0 +1,113 @@
+---
+- name: Provision OpenPango Node on Raspberry Pi
+  hosts: all
+  become: yes
+  vars:
+    openpango_user: openpango
+    openpango_home: /opt/openpango
+    ollama_home: /opt/ollama
+    nodejs_version: "20"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Install build dependencies
+      apt:
+        name:
+          - build-essential
+          - curl
+          - wget
+          - git
+          - sqlite3
+          - libsqlite3-dev
+          - python3
+          - python3-pip
+          - python3-venv
+          - firefox-esr
+          - fonts-liberation
+          - libasound2
+          - libatk-bridge2.0-0
+          - libatk1.0-0
+          - libatspi2.0-0
+          - libcups2
+          - libdbus-1-3
+          - libdrm2
+          - libgbm1
+          - libgtk-3-0
+          - libnspr4
+          - libnss3
+          - libwayland-client0
+          - libxcomposite1
+          - libxdamage1
+          - libxfixes3
+          - libxkbcommon0
+          - libxrandr2
+          - xdg-utils
+        state: present
+
+    - name: Add Node.js repository
+      shell: curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Install Ollama
+      shell: curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        creates: /usr/local/bin/ollama
+
+    - name: Create openpango user
+      user:
+        name: "{{ openpango_user }}"
+        system: yes
+        home: "{{ openpango_home }}"
+        shell: /bin/bash
+
+    - name: Create ollama user
+      user:
+        name: ollama
+        system: yes
+        home: "{{ ollama_home }}"
+        shell: /bin/bash
+
+    - name: Install OpenPango CLI
+      npm:
+        name: openpango
+        global: yes
+        state: present
+
+    - name: Copy systemd service files
+      copy:
+        src: ../systemd/{{ item }}
+        dest: /etc/systemd/system/{{ item }}
+        mode: '0644'
+      loop:
+        - openpango.service
+        - ollama.service
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Ollama
+      systemd:
+        name: ollama
+        enabled: yes
+        state: started
+
+    - name: Enable and start OpenPango
+      systemd:
+        name: openpango
+        enabled: yes
+        state: started
+
+    - name: Print status
+      debug:
+        msg: "OpenPango Node is now running! Access at http://{{ ansible_default_ipv4.address }}:4000"
