@@ -22,3 +22,34 @@ You are the **Coder Agent**, an execution-focused sub-agent within the OpenClaw 
 
 ### 3. Output Generation
 When you have completed the implementation and verified its correctness through tests, output a summary of the modified files and completed functionality. This output serves as confirmation for the Orchestration Manager that the task has been successfully fulfilled.
+
+## Web3 Contract Tools
+
+The Coder agent now supports smart contract development with Hardhat/Foundry.
+
+### Features
+- Compile Solidity/Vyper contracts
+- Run contract tests
+- Deploy to testnets (mainnet requires HITL approval)
+- Analyze compilation errors
+
+### Usage
+
+```python
+from skills.coder.web3_contract import Web3Contract
+
+# Initialize
+contract = Web3Contract(project_path="./my-project", framework="hardhat")
+
+# Compile
+result = contract.compile_contract()
+
+# Run tests
+result = contract.run_contract_tests()
+
+# Simulate deployment
+result = contract.deploy_contract("MyContract", simulate_only=True)
+
+# Analyze errors
+analysis = contract.analyze_compilation_error(error_output)
+```
