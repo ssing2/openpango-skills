@@ -42,6 +42,7 @@ jobs:
           CHANGED=$(git diff --name-only FETCH_HEAD HEAD -- skills/ | \
             grep '^skills/' | \
             cut -d'/' -f2 | \
+            grep -v '^\.' | \
             sort -u | \
             tr '\n' ',' | \
             sed 's/,$//')
