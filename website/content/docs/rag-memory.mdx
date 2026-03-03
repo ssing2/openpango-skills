@@ -1,0 +1,97 @@
+---
+title: "RAG Memory"
+description: "Semantic search and retrieval-augmented generation for agent memory"
+---
+
+# RAG Memory — Semantic Search for Agents
+
+The memory skill includes a full RAG (Retrieval-Augmented Generation) pipeline that gives agents the ability to **semantically search** their memories instead of just keyword matching.
+
+## How It Works
+
+```
+Agent Output → chunk_text() → embed() → VectorStore (JSON)
+                                              ↓
+Query → embed() → cosine_similarity → Ranked Results
+```
+
+1. **Ingest**: Text is chunked into overlapping segments, each embedded as a vector
+2. **Store**: Vectors persist to `~/.openclaw/workspace/vectors.json`
+3. **Recall**: Queries are embedded and compared against stored vectors using cosine similarity
+
+## Quick Start
+
+### Python API
+
+```python
+from skills.memory.semantic_search import ingest, recall
+
+# Store a memory
+ingest("The A2A protocol uses JSON-RPC for inter-agent communication.",
+       source="research", tags=["a2a", "protocol"])
+
+# Recall relevant memories
+result = recall("How do agents communicate?", top_k=3)
+for r in result["results"]:
+    print(f"{r['score']:.2f} — {r['text'][:80]}")
+```
+
+### CLI
+
+```bash
+# Ingest text
+python3 skills/memory/semantic_search.py ingest \
+  "Important finding about agent coordination." \
+  --source research --tags coordination agents
+
+# Recall relevant chunks
+python3 skills/memory/semantic_search.py recall \
+  "agent coordination" --top-k 5
+
+# View stats
+python3 skills/memory/semantic_search.py stats
+
+# Clear store
+python3 skills/memory/semantic_search.py clear
+```
+
+## Embedding Backends
+
+Set `EMBEDDING_BACKEND` environment variable:
+
+| Backend | Value | Notes |
+|---|---|---|
+| TF-IDF | `tfidf` (default) | Zero dependencies, works offline |
+| Ollama | `ollama` | Local LLM embeddings via Ollama |
+| OpenAI | `openai` | Requires `OPENAI_API_KEY` |
+
+```bash
+# Use Ollama for higher quality embeddings
+EMBEDDING_BACKEND=ollama python3 skills/memory/semantic_search.py \
+  ingest "High quality memory entry"
+```
+
+## Metadata Filtering
+
+Every ingested chunk stores metadata that can be filtered on recall:
+
+```python
+# Filter by source
+recall("protocol details", source_filter="research")
+
+# Filter by session
+recall("what happened yesterday", session_filter="sess-2026-03-01")
+```
+
+## Storage
+
+Vectors are stored as a single JSON file at `~/.openclaw/workspace/vectors.json`. The format includes:
+- Entry ID (UUID)
+- Raw text
+- Embedding vector
+- Metadata (source, session, tags, timestamp)
+- Shared TF-IDF vocabulary (for the default backend)
+
+## Tests
+
+57 tests cover chunking, embeddings, cosine similarity, VectorStore CRUD, ingest/recall end-to-end, CLI, and persistence.

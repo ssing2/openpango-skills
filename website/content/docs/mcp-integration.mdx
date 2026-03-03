@@ -1,0 +1,99 @@
+---
+title: "MCP Integration"
+description: "Connect OpenPango skills to Claude Desktop, Cursor, and any MCP-compatible client"
+---
+
+# MCP (Model Context Protocol) Integration
+
+OpenPango ships with a built-in MCP server that makes every installed skill available as a tool in any MCP-compatible client — Claude Desktop, Cursor, Windsurf, and more.
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io) is the emerging standard for connecting AI models to external tools. Instead of writing custom integrations for each LLM client, MCP provides a single protocol that all clients understand.
+
+OpenPango's MCP server **auto-discovers all installed skills** and registers them as MCP tools. When you add a new skill, it's automatically available in every connected client.
+
+## Quick Start
+
+### 1. Register with Claude Desktop
+
+```bash
+python3 -m skills.mcp.mcp_server --register-claude
+```
+
+This prints the config snippet to add to:
+`~/Library/Application Support/Claude/claude_desktop_config.json`
+
+### 2. List Available Tools
+
+```bash
+python3 -m skills.mcp.mcp_server --list-tools
+```
+
+Currently discovers **28 tools** from all installed OpenPango skills, plus two built-in tools:
+- `openpango_pool_stats` — Live mining pool statistics
+- `openpango_list_skills` — List all installed skills
+
+### 3. Manual Config
+
+Add this to your MCP client's configuration:
+
+```json
+{
+  "mcpServers": {
+    "openpango": {
+      "command": "python3",
+      "args": ["-m", "skills.mcp.mcp_server"],
+      "cwd": "/path/to/openpango-skills"
+    }
+  }
+}
+```
+
+## Architecture
+
+The MCP server uses **stdio transport** (JSON-RPC over stdin/stdout):
+
+```
+MCP Client ←→ stdin/stdout ←→ mcp_server.py ←→ OpenPango Skills
+```
+
+Supported methods:
+- `initialize` — Protocol handshake
+- `tools/list` — List all available tools
+- `tools/call` — Execute a tool
+- `resources/list` — List available resources
+
+## Configuration
+
+Create `mcp_config.json` in your project root to customize behavior:
+
+```json
+{
+  "server": {
+    "name": "openpango-skills",
+    "version": "1.0.0"
+  },
+  "skills": {
+    "expose_all": true,
+    "allowlist": ["browser", "memory", "mining", "mcp"]
+  },
+  "auth": {
+    "require_token": false
+  }
+}
+```
+
+Set `expose_all` to `false` and use `allowlist` to restrict which skills are exposed.
+
+## MCP Client
+
+OpenPango also includes an MCP client for consuming external MCP servers:
+
+```python
+from skills.mcp.mcp_client import MCPClient
+
+with MCPClient("python3", ["-m", "external_server"]) as client:
+    tools = client.list_tools()
+    result = client.call_tool("web_search", {"query": "OpenPango"})
+```
