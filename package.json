@@ -14,5 +14,8 @@
   "license": "ISC",
   "devDependencies": {
     "jest": "^30.2.0"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
   }
 }

@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: microsoft-365
 description: "Microsoft 365 Graph API integration for Teams, Outlook, and Excel with app/delegated auth modes."
 ---

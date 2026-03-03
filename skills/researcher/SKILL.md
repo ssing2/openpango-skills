@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: researcher
 description: "Specialized in deep codebase research, finding information, and web search."
 user-invocable: false

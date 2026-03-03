@@ -3,11 +3,13 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const { execSync } = require('child_process');
+const yaml = require('js-yaml');
 const { initWorkspace } = require('../shared/workspace');
 
 const OPENCLAW_DIR = path.join(os.homedir(), '.openclaw');
 const SKILLS_DIR = path.join(OPENCLAW_DIR, 'skills');
 const LOCAL_SKILLS_DIR = path.join(__dirname, '..', 'skills');
+const VERSIONS_DIR = path.join(SKILLS_DIR, '.versions');
 
 const getAvailableSkills = () => {
   return fs.readdirSync(LOCAL_SKILLS_DIR).filter(file => {
@@ -18,8 +20,28 @@ const getAvailableSkills = () => {
 const getInstalledSkills = () => {
   if (!fs.existsSync(SKILLS_DIR)) return [];
   return fs.readdirSync(SKILLS_DIR).filter(file => {
+    if (file === '.versions') return false;
     return fs.existsSync(path.join(SKILLS_DIR, file, 'SKILL.md'));
   });
+};
+
+const parseSkillMetadata = (skillDir) => {
+  const mdPath = path.join(skillDir, 'SKILL.md');
+  if (!fs.existsSync(mdPath)) return null;
+
+  const content = fs.readFileSync(mdPath, 'utf8');
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+
+  let metadata = { name: path.basename(skillDir), version: '1.0.0' }; // Default
+  if (match) {
+    try {
+      const parsed = yaml.load(match[1]);
+      if (parsed) metadata = { ...metadata, ...parsed };
+    } catch (e) {
+      console.warn(`Warning: Failed to parse YAML frontmatter in ${mdPath}`);
+    }
+  }
+  return metadata;
 };
 
 // WHY: Security gate — scan skill source before creating any symlink.
@@ -46,7 +68,13 @@ const scanSkillSecurity = (skillSrcDir) => {
     fs.readdirSync(dir).forEach(name => {
       if (name === 'node_modules') return;
       const full = path.join(dir, name);
-      const stat = fs.statSync(full);
+      let stat;
+      try {
+        stat = fs.statSync(full);
+      } catch (err) {
+        return; // Skip broken symlinks or missing files like .browser_data/RunningChromeVersion
+      }
+
       if (stat.isDirectory()) {
         results = results.concat(walkDir(full));
       } else if (/\.(js|ts|json|mjs|cjs)$/.test(name)) {
@@ -189,6 +217,172 @@ const listSkills = () => {
     console.log(`  ${isInstalled ? '[x]' : '[ ]'} ${skill}`);
   });
 };
+
+// ---------------------------------------------------------------------------
+// Skill Version Management (Bounty #48)
+// ---------------------------------------------------------------------------
+
+const snapshotSkill = (skill, version) => {
+  const destDir = path.join(SKILLS_DIR, skill);
+  if (!fs.existsSync(destDir)) return false;
+
+  const snapshotDir = path.join(VERSIONS_DIR, skill, version);
+  if (fs.existsSync(snapshotDir)) {
+    // Already snapshotted
+    return true;
+  }
+
+  console.log(`Snapshotting ${skill} v${version}...`);
+  fs.mkdirSync(snapshotDir, { recursive: true });
+
+  const realTarget = fs.realpathSync(destDir);
+  // Recursive copy of the target directory to the snapshot directory (avoiding node_modules if present)
+  const copyDir = (src, dest) => {
+    fs.mkdirSync(dest, { recursive: true });
+    fs.readdirSync(src).forEach(item => {
+      if (['node_modules', '__pycache__', '.browser_data'].includes(item)) return;
+      const srcPath = path.join(src, item);
+      const destPath = path.join(dest, item);
+      try {
+        const stat = fs.lstatSync(srcPath);
+        if (stat.isDirectory()) {
+          copyDir(srcPath, destPath);
+        } else {
+          fs.copyFileSync(srcPath, destPath);
+        }
+      } catch (err) {
+        // Skip missing files or broken symlinks (like playwright tmp files)
+      }
+    });
+  };
+
+  copyDir(realTarget, snapshotDir);
+  return true;
+};
+
+const upgradeSkill = (skill) => {
+  const destDir = path.join(SKILLS_DIR, skill);
+  if (!fs.existsSync(destDir)) {
+    console.error(`Skill '${skill}' is not installed. Use 'install' instead.`);
+    return;
+  }
+
+  const currentMeta = parseSkillMetadata(destDir);
+  const currentVersion = currentMeta ? currentMeta.version : '1.0.0';
+
+  // Snapshot current version
+  snapshotSkill(skill, currentVersion);
+
+  // Unlink and re-install from local workspace to get latest
+  fs.unlinkSync(destDir);
+  const srcDir = path.join(LOCAL_SKILLS_DIR, skill);
+
+  const report = scanSkillSecurity(srcDir);
+  if (!report.passed) {
+    console.error(`\n⚠️  Security scan FAILED during upgrade of '${skill}'. Rollback recommended.`);
+    report.violations.forEach(v => console.error(`  • ${v}`));
+    return;
+  }
+
+  fs.symlinkSync(srcDir, destDir, 'dir');
+  const newMeta = parseSkillMetadata(destDir);
+  const newVersion = newMeta ? newMeta.version : '1.0.0';
+
+  console.log(`✅ Upgraded ${skill} to v${newVersion} (workspace latest).`);
+};
+
+const rollbackSkill = (skill) => {
+  const snapshotsDir = path.join(VERSIONS_DIR, skill);
+  if (!fs.existsSync(snapshotsDir)) {
+    console.error(`No previous versions found for '${skill}'.`);
+    return;
+  }
+
+  const snapshots = fs.readdirSync(snapshotsDir).filter(f => fs.statSync(path.join(snapshotsDir, f)).isDirectory());
+  if (snapshots.length === 0) {
+    console.error(`No previous versions found for '${skill}'.`);
+    return;
+  }
+
+  const destDir = path.join(SKILLS_DIR, skill);
+  let currentVersion = 'unknown';
+  if (fs.existsSync(destDir)) {
+    const currentMeta = parseSkillMetadata(destDir);
+    currentVersion = currentMeta ? currentMeta.version : '1.0.0';
+    snapshotSkill(skill, currentVersion); // Snapshot before rollback just in case
+    fs.unlinkSync(destDir);
+  }
+
+  // Sort logically (semver rough sort)
+  snapshots.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+
+  // Find the most recent snapshot that isn't the current version
+  let targetVersion = snapshots.find(v => v !== currentVersion);
+  if (!targetVersion) targetVersion = snapshots[0]; // Fallback to whatever is there
+
+  const targetDir = path.join(snapshotsDir, targetVersion);
+  fs.symlinkSync(targetDir, destDir, 'dir');
+  console.log(`⏪ Rolled back ${skill} to v${targetVersion}.`);
+};
+
+const listSkillVersions = (skill) => {
+  const destDir = path.join(SKILLS_DIR, skill);
+  let activeVersion = 'None';
+  let activeTarget = '';
+
+  if (fs.existsSync(destDir)) {
+    const meta = parseSkillMetadata(destDir);
+    activeVersion = meta ? meta.version : '1.0.0';
+    try {
+      activeTarget = fs.realpathSync(destDir);
+    } catch (_) { }
+  } else {
+    console.log(`Skill '${skill}' is not currently installed.`);
+  }
+
+  const snapshotsDir = path.join(VERSIONS_DIR, skill);
+  let snapshots = [];
+  if (fs.existsSync(snapshotsDir)) {
+    snapshots = fs.readdirSync(snapshotsDir).filter(f => fs.statSync(path.join(snapshotsDir, f)).isDirectory());
+  }
+
+  const allVersions = new Set(snapshots);
+  if (activeVersion !== 'None') allVersions.add(activeVersion);
+
+  const sortedVersions = Array.from(allVersions).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+
+  if (sortedVersions.length === 0) {
+    console.log(`No version history found for '${skill}'.`);
+    return;
+  }
+
+  console.log(`\nVersion history for ${c.bold(skill)}:`);
+
+  sortedVersions.forEach(v => {
+    let tag = '';
+    if (v === activeVersion) {
+      const isWorkspace = activeTarget.startsWith(LOCAL_SKILLS_DIR);
+      tag = c.green(` [ACTIVE]${isWorkspace ? ' (workspace hook)' : ''}`);
+    } else {
+      tag = c.dim(' (snapshot)');
+    }
+    console.log(`  • v${v}${tag}`);
+
+    // Check changelog if it exists in snapshot
+    let readDir = v === activeVersion && activeTarget.startsWith(LOCAL_SKILLS_DIR)
+      ? path.join(LOCAL_SKILLS_DIR, skill)
+      : path.join(snapshotsDir, v);
+
+    if (fs.existsSync(readDir)) {
+      const meta = parseSkillMetadata(readDir);
+      if (meta && meta.changelog) {
+        console.log(c.dim(`      Changelog: ${meta.changelog}`));
+      }
+    }
+  });
+  console.log('');
+};
+
 
 // ---------------------------------------------------------------------------
 // Health Check System (Bounty #6)
@@ -596,6 +790,24 @@ const run = async () => {
     case 'health':
       health();
       break;
+    case 'upgrade': {
+      const skill = cleanArgs[1];
+      if (skill) upgradeSkill(skill);
+      else console.log('Usage: openpango upgrade <skill>');
+      break;
+    }
+    case 'rollback': {
+      const skill = cleanArgs[1];
+      if (skill) rollbackSkill(skill);
+      else console.log('Usage: openpango rollback <skill>');
+      break;
+    }
+    case 'versions': {
+      const skill = cleanArgs[1];
+      if (skill) listSkillVersions(skill);
+      else console.log('Usage: openpango versions <skill>');
+      break;
+    }
     default:
       console.log('OpenPango Skill Manager');
       console.log('Usage:');
@@ -604,13 +816,17 @@ const run = async () => {
       console.log('  openpango list                 List available skills');
       console.log('  openpango status               Show status of installed skills');
       console.log('  openpango health               Health check (alias for status)');
+      console.log('  openpango upgrade <skill>      Upgrade skill to latest workspace version (snapshots current)');
+      console.log('  openpango rollback <skill>     Rollback skill to the previous snapshotted version');
+      console.log('  openpango versions <skill>     List version history of a skill');
       console.log('\nFlags:');
       console.log('  --force                        Override security scan failures (use with caution)');
       break;
   }
 };
 
-if (require.main === module) {
+// Support both direct execution and execution via bin/openpango.js wrapper
+if (require.main === module || (require.main && require.main.filename.endsWith('openpango.js'))) {
   run().catch(err => {
     console.error('Fatal error:', err.message);
     process.exit(1);
@@ -684,4 +900,18 @@ const sandboxTestSkill = (skillSrcDir) => {
 };
 
 // WHY: Export internals for unit testing without re-running run().
-module.exports = { scanSkillSecurity, sandboxTestSkill, installSkills, removeSkills, listSkills, status, getAvailableSkills, getInstalledSkills };
+module.exports = {
+  scanSkillSecurity,
+  sandboxTestSkill,
+  installSkills,
+  removeSkills,
+  listSkills,
+  status,
+  getAvailableSkills,
+  getInstalledSkills,
+  upgradeSkill,
+  rollbackSkill,
+  listSkillVersions,
+  parseSkillMetadata,
+  snapshotSkill
+};

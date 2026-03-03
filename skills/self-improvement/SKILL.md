@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: self-improvement
 description: "Captures learnings, proposes self-updates via git, and coordinates ecosystem growth."
 user-invocable: true

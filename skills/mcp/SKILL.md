@@ -1,3 +1,8 @@
+---
+name: mcp
+version: 1.0.0
+---
+
 # MCP (Model Context Protocol) Skill
 
 Turns any OpenPango agent into an **MCP server**, making all installed skills available as tools in MCP-compatible clients (Claude Desktop, Cursor, Windsurf, etc.).

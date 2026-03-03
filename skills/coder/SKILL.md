@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: coder
 description: "Specialized in implementing code, writing tests, and refactoring."
 user-invocable: false

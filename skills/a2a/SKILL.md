@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: a2a
 description: "Agent-to-Agent communication protocol for discovering, negotiating with, and delegating tasks between agents."
 user-invocable: true

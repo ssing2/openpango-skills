@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: browser
 description: "Full-capability Playwright-based web automation."
 user-invocable: true

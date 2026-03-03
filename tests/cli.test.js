@@ -344,7 +344,136 @@ describe('Skill Lifecycle', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. CLI Entry-Point Smoke Test
+// 6. Skill Version Management (Bounty #48)
+// ---------------------------------------------------------------------------
+
+describe('Skill Version Management', () => {
+    let tmpDir;
+    let originalHomedir;
+    let cli;
+
+    beforeEach(() => {
+        tmpDir = mkTmpDir('openpango-versions-');
+
+        // Mock homedir for isolated testing
+        originalHomedir = os.homedir;
+        os.homedir = () => tmpDir;
+
+        // Reset required module to pick up mocked homedir
+        jest.resetModules();
+        cli = require('../src/cli');
+
+        // Setup initial workspace
+        const { initWorkspace } = require('../shared/workspace');
+        initWorkspace();
+    });
+
+    afterEach(() => {
+        os.homedir = originalHomedir;
+        rmrf(tmpDir);
+    });
+
+    test('snapshotSkill creates a copy of the skill directory', () => {
+        const skillsDir = path.join(tmpDir, '.openclaw', 'skills');
+        fs.mkdirSync(skillsDir, { recursive: true });
+
+        const skillDir = createMockSkill(skillsDir, 'test-skill', {
+            'index.js': 'console.log("v1");',
+            'SKILL.md': '---\nversion: 1.0.0\n---\n# Test Skill'
+        });
+
+        // Test the internal function
+        const result = cli.snapshotSkill('test-skill', '1.0.0');
+        expect(result).toBe(true);
+
+        const snapshotDir = path.join(skillsDir, '.versions', 'test-skill', '1.0.0');
+        expect(fs.existsSync(snapshotDir)).toBe(true);
+        expect(fs.existsSync(path.join(snapshotDir, 'index.js'))).toBe(true);
+    });
+
+    test('parseSkillMetadata extracts yaml frontmatter', () => {
+        const skillDir = createMockSkill(tmpDir, 'yaml-skill', {
+            'SKILL.md': '---\nversion: 2.1.0\nchangelog: "Added new feature"\n---\n# YAML Skill'
+        });
+
+        const meta = cli.parseSkillMetadata(skillDir);
+        expect(meta).not.toBeNull();
+        expect(meta.version).toBe('2.1.0');
+        expect(meta.changelog).toBe('Added new feature');
+    });
+
+    test('rollbackSkill restores a previous snapshot', () => {
+        const skillsDir = path.join(tmpDir, '.openclaw', 'skills');
+        fs.mkdirSync(skillsDir, { recursive: true });
+
+        // Setup versions
+        const v1Dir = createMockSkill(path.join(skillsDir, '.versions', 'test-skill'), '1.0.0', {
+            'index.js': 'console.log("v1");'
+        });
+        const v2Dir = createMockSkill(path.join(skillsDir, '.versions', 'test-skill'), '2.0.0', {
+            'index.js': 'console.log("v2");'
+        });
+
+        // Set active to v2
+        const activeDir = path.join(skillsDir, 'test-skill');
+        fs.symlinkSync(v2Dir, activeDir, 'dir');
+
+        const logSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
+        // Since both 1.0.0 and 2.0.0 exist in snapshots, but the active version is 2.0.0,
+        // it should pick the non-active largest, which is 1.0.0. Let's make sure it rolled back to 1.0.0
+        // Our active version in the mock is explicitly 2.0.0. Wait, in the test we symlinked directly
+        // to the v2 snapshot, which means parsing SKILL.md will return whatever is in v2Dir (doesn't have SKILL.md!)
+        // Let's add SKILL.md to the v2Dir so currentMeta parsing works.
+        const v2DirWithMeta = createMockSkill(path.join(skillsDir, '.versions', 'test-skill-2'), '2.0.0', {
+            'index.js': 'console.log("v2");',
+            'SKILL.md': '---\nversion: 2.0.0\n---\n# v2'
+        });
+        fs.unlinkSync(activeDir);
+        fs.symlinkSync(v2DirWithMeta, activeDir, 'dir');
+
+        cli.rollbackSkill('test-skill');
+
+        const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+        expect(output).toContain('Rolled back test-skill to v1.0.0');
+
+        // Active should now point to v1
+        const target = fs.realpathSync(activeDir);
+        expect(target).toBe(fs.realpathSync(v1Dir));
+
+        logSpy.mockRestore();
+    });
+
+    test('listSkillVersions displays active and snapshot versions', () => {
+        const skillsDir = path.join(tmpDir, '.openclaw', 'skills');
+        fs.mkdirSync(skillsDir, { recursive: true });
+
+        // Setup versions
+        createMockSkill(path.join(skillsDir, '.versions', 'test-skill'), '1.0.0');
+        createMockSkill(path.join(skillsDir, '.versions', 'test-skill'), '1.1.0', {
+            'SKILL.md': '---\nversion: 1.1.0\nchangelog: "Fixes"\n---'
+        });
+
+        // Set active
+        const activeDir = path.join(skillsDir, 'test-skill');
+        fs.mkdirSync(activeDir, { recursive: true });
+        fs.writeFileSync(path.join(activeDir, 'SKILL.md'), '---\nversion: 2.0.0\n---');
+
+        const logSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
+        cli.listSkillVersions('test-skill');
+
+        const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+        expect(output).toContain('v2.0.0');
+        expect(output).toContain('[ACTIVE]');
+        expect(output).toContain('v1.1.0');
+        expect(output).toContain('Fixes');
+        expect(output).toContain('v1.0.0');
+
+        logSpy.mockRestore();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// 7. CLI Entry-Point Smoke Test
 // ---------------------------------------------------------------------------
 
 describe('CLI Smoke Tests', () => {

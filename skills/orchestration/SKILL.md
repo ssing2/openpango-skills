@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: orchestration
 description: "Orchestrates multi-agent task workflows by parsing user requests and delegating to specialized sub-agents."
 user-invocable: true

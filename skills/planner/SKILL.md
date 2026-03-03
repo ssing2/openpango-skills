@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: planner
 description: "Specialized in designing system architecture and task graphs."
 user-invocable: false

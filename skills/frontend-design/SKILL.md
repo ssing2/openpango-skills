@@ -1,4 +1,5 @@
 ---
+version: 1.0.0
 name: frontend-design
 description: "Create distinctive, production-grade frontend interfaces with high design quality."
 user-invocable: true
