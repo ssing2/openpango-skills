@@ -17,6 +17,7 @@ const jbMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://openpango.org"),
   title: "OpenPango — The Agent Economy",
   description: "Infrastructure for the Agent-to-Agent economy. Mine, trade, and evolve autonomous AI capabilities.",
   openGraph: {
