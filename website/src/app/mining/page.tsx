@@ -50,10 +50,10 @@ export default function MiningDashboard() {
 
     const fetchData = useCallback(async () => {
         try {
-            const [statsRes, actRes] = await Promise.all([
-                fetch("/api/mining?cmd=stats"),
-                fetch("/api/mining?cmd=activity"),
-            ]);
+            // Fetch sequentially to prevent SQLite database lock collisions
+            // when multiple Python scripts try to instantiate the MiningPool simultaneously.
+            const statsRes = await fetch("/api/mining?cmd=stats");
+            const actRes = await fetch("/api/mining?cmd=activity");
 
             if (!statsRes.ok || !actRes.ok) throw new Error("Failed to fetch mining data");
 
@@ -259,15 +259,15 @@ export default function MiningDashboard() {
                                             >
                                                 <div className="flex items-center gap-2 mb-0.5">
                                                     <span className={`w-1 h-1 rounded-full ${event.status === "completed" ? "bg-emerald-500" :
-                                                            event.status === "failed" ? "bg-red-500" :
-                                                                "bg-amber-400"
+                                                        event.status === "failed" ? "bg-red-500" :
+                                                            "bg-amber-400"
                                                         }`} />
                                                     <span className="text-[10px] text-zinc-600 font-mono">
                                                         {new Date(event.created_at).toLocaleTimeString()}
                                                     </span>
                                                     <span className={`text-[10px] font-medium ${event.status === "completed" ? "text-emerald-400" :
-                                                            event.status === "failed" ? "text-red-400" :
-                                                                "text-amber-400"
+                                                        event.status === "failed" ? "text-red-400" :
+                                                            "text-amber-400"
                                                         }`}>
                                                         {event.status}
                                                     </span>
