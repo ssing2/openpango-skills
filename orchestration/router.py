@@ -10,6 +10,70 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+try:
+    import hvac
+except ImportError:
+    hvac = None
+
+# Configure logging to console
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("router")
+
+# Determine workspace paths
+WORKSPACE_DIR = Path(os.environ.get("OPENCLAW_WORKSPACE", Path.home() / ".openclaw" / "workspace"))
+SESSIONS_DIR = WORKSPACE_DIR / "sessions"
+
+class VaultClient:
+    """Wrapper for hvac to dynamically resolve secrets using AppRole or Token auth."""
+    def __init__(self):
+        self.url = os.environ.get("VAULT_ADDR", "http://127.0.0.1:8200")
+        self.role_id = os.environ.get("VAULT_ROLE_ID")
+        self.secret_id = os.environ.get("VAULT_SECRET_ID")
+        self.token = os.environ.get("VAULT_TOKEN")
+        self.client = None
+
+        if hvac is None:
+            logger.warning("Vault integration disabled: 'hvac' library not installed.")
+            return
+
+        try:
+            self.client = hvac.Client(url=self.url)
+            self._authenticate()
+        except Exception as e:
+            logger.error(f"Failed to initialize Vault client: {e}")
+            self.client = None
+
+    def _authenticate(self):
+        if not self.client:
+            return
+
+        if self.role_id and self.secret_id:
+            logger.info("Authenticating via Vault AppRole...")
+            self.client.auth.approle.login(role_id=self.role_id, secret_id=self.secret_id)
+        elif self.token:
+            logger.info("Authenticating via Vault Token...")
+            self.client.token = self.token
+        
+        if not self.client.is_authenticated():
+            logger.error("Vault client failed to authenticate.")
+            self.client = None
+
+    def get_secret(self, path: str, key: str = None):
+        """Fetches a secret from vault's KV v2 engine."""
+        if not self.client:
+            raise RuntimeError("Vault is not configured or authenticated.")
+        
+        try:
+            read_response = self.client.secrets.kv.v2.read_secret_version(path=path)
+            data = read_response['data']['data']
+            if key:
+                if key not in data:
+                    raise KeyError(f"Key '{key}' not found in secret '{path}'")
+                return data[key]
+            return data
+        except Exception as e:
+            raise RuntimeError(f"Vault error reading {path}: {e}")
+
 # Configure logging to console
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("router")
@@ -136,9 +200,27 @@ def cmd_append(args):
         _background_worker(args.session_id, args.task_payload)
         sys.exit(0)
 
+def cmd_resolve_secret(args):
+    """Resolves a secret from Vault based on CLI arguments."""
+    vault = VaultClient()
+    try:
+        val = vault.get_secret(args.path, args.key)
+        if isinstance(val, dict):
+            print(json.dumps(val, indent=2))
+        else:
+            print(val)
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(description="OpenClaw Orchestration Router (Manager Agent)")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # `resolve-secret`
+    secret_parser = subparsers.add_parser("resolve-secret", help="Dynamically fetch a short-lived scoped API key from HashiCorp Vault")
+    secret_parser.add_argument("path", help="Vault secret path (e.g., 'openpango/twitter')")
+    secret_parser.add_argument("key", nargs="?", help="Specific JSON key to retrieve (optional)")
 
     # `spawn`
     spawn_parser = subparsers.add_parser("spawn", help="Spawn a new agent session")
@@ -167,6 +249,8 @@ def main():
         cmd_status(args)
     elif args.command == "output":
         cmd_output(args)
+    elif args.command == "resolve-secret":
+        cmd_resolve_secret(args)
 
 if __name__ == "__main__":
     main()
