@@ -17,5 +17,8 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
+  },
+  "pythonDependencies": {
+    "gymnasium": "^0.29.1"
   }
 }
