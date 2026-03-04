@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pickaxe, TrendingUp, Zap, Clock, Users, ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { getAdminKey, clearAdminKey } from "@/lib/auth";
 
 interface Miner {
     miner_id: string;
@@ -82,8 +83,18 @@ export default function MiningDashboard() {
     }, [fetchData]);
 
     const seedMiners = async () => {
+        const key = getAdminKey();
+        if (!key) return;
+
         setLoading(true);
-        await fetch("/api/mining?cmd=register");
+        const res = await fetch("/api/mining?cmd=register", {
+            headers: { "x-admin-key": key }
+        });
+
+        if (res.status === 401) {
+            clearAdminKey();
+            alert("Unauthorized: Invalid admin key.");
+        }
         await fetchData();
     };
 

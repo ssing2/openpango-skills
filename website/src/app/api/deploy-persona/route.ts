@@ -14,6 +14,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid persona configuration" }, { status: 400 });
         }
 
+        const providedKey = req.headers.get("x-admin-key");
+        if (!process.env.ADMIN_SECRET || providedKey !== process.env.ADMIN_SECRET) {
+            return NextResponse.json({ error: "Unauthorized: Invalid admin key" }, { status: 401 });
+        }
+
         // Determine the path to the mining pool script
         // __dirname is inside .next/server/app/api/...
         // process.cwd() is /Users/nico/Desktop/project/website

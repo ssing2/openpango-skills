@@ -7,6 +7,7 @@ import {
   personaToYaml,
   toPersonaDocument,
 } from "@/lib/persona";
+import { getAdminKey, clearAdminKey } from "@/lib/auth";
 
 type ExportKind = "json" | "yaml";
 
@@ -91,10 +92,17 @@ export default function PersonaBuilderPage() {
     setIsDeploying(true);
     setDeployResult(null);
     try {
+      const key = getAdminKey();
+      if (!key) {
+        setIsDeploying(false);
+        return;
+      }
+
       const res = await fetch("/api/deploy-persona", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-admin-key": key
         },
         body: personaJson,
       });
@@ -164,8 +172,8 @@ export default function PersonaBuilderPage() {
                       type="button"
                       onClick={() => toggleTool(tool)}
                       className={`px-3 py-1.5 rounded-full text-sm border transition flex items-center gap-1.5 ${active
-                          ? "bg-[#ff3e00]/20 border-[#ff3e00] text-white"
-                          : "bg-black/40 border-white/10 text-zinc-400 hover:text-zinc-200"
+                        ? "bg-[#ff3e00]/20 border-[#ff3e00] text-white"
+                        : "bg-black/40 border-white/10 text-zinc-400 hover:text-zinc-200"
                         }`}
                     >
                       {active && <span className="w-1.5 h-1.5 rounded-full bg-[#ff3e00]" />}

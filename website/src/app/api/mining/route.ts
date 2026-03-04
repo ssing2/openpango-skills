@@ -17,6 +17,14 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Invalid command" }, { status: 400 });
     }
 
+    // Require admin secret for mutating commands
+    if (cmd === "register" || cmd === "task") {
+        const providedKey = request.headers.get("x-admin-key");
+        if (!process.env.ADMIN_SECRET || providedKey !== process.env.ADMIN_SECRET) {
+            return NextResponse.json({ error: "Unauthorized: Invalid admin key" }, { status: 401 });
+        }
+    }
+
     try {
         const { stdout, stderr } = await execAsync(
             `cd "${PROJECT_ROOT}" && python3 "${SCRIPT}" ${cmd}`,

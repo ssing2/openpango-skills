@@ -6,6 +6,7 @@ import Link from "next/link";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { LiveCursors } from "@/components/operator/LiveCursors";
+import { getAdminKey, clearAdminKey } from "@/lib/auth";
 
 interface TaskEntry {
     task_id: string;
@@ -121,9 +122,19 @@ export default function OperatorPage() {
 
     // Dispatch and broadcast to Yjs
     const dispatchTask = async () => {
+        const key = getAdminKey();
+        if (!key) return;
+
         setDispatching(true);
         try {
-            const res = await fetch("/api/mining?cmd=task");
+            const res = await fetch("/api/mining?cmd=task", {
+                headers: { "x-admin-key": key }
+            });
+            if (res.status === 401) {
+                clearAdminKey();
+                alert("Unauthorized: Invalid admin key.");
+                return;
+            }
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const result = await res.json();
 
