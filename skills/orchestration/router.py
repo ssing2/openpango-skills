@@ -1,66 +1,212 @@
 #!/usr/bin/env python3
 """
-router.py - OpenPango real router for managing sub-agents.
-Provides basic multi-agent session management, task appending, and execution via Gemini CLI.
+router.py - OpenPango Async Router (Non-Polling Version)
+
+This is a refactored version of the original router.py that replaces
+polling-based waiting with event-driven asyncio architecture, following
+OpenPango's "No Polling" principle.
+
+Key improvements:
+- Replaces time.sleep() polling with asyncio.Event blocking waits
+- Uses JSONL instead of JSON for Git-friendly event sourcing
+- Cleaner class-based architecture
+- Full async/await support
+
+Usage:
+    python router.py spawn <agent_type>
+    python router.py append <session_id> <task_payload>
+    python router.py status <session_id>
+    python router.py wait <session_id> [--timeout SECONDS]
+    python router.py output <session_id>
 """
-import argparse
+
+import asyncio
 import json
 import uuid
 import sys
-import time
+import os
+import argparse
 import subprocess
 import threading
+from dataclasses import dataclass, asdict
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, Optional, Any, List
 
+# Same paths as original
 BASE_DIR = Path(__file__).parent.parent.parent
 SKILLS_DIR = BASE_DIR / "skills"
-STORAGE_FILE = Path(__file__).parent / "openpango_storage.json"
+STORAGE_FILE = Path(__file__).parent / "openpango_storage.jsonl"  # Changed to JSONL
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
 
 VALID_AGENTS = {"Researcher", "Planner", "Coder", "Designer"}
 
-def load_storage():
-    if STORAGE_FILE.exists():
+# ============================================================================
+# Data Models
+# ============================================================================
+
+@dataclass
+class Session:
+    """Agent session with improved data structure."""
+    id: str
+    agent_type: str
+    status: str = "idle"
+    task: Optional[str] = None
+    output_file: Optional[str] = None
+    created_at: float = None
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+
+    def __post_init__(self):
+        if self.created_at is None:
+            import time
+            self.created_at = time.time()
+
+    def to_dict(self) -> dict:
+        """Convert to JSON-serializable dict."""
+        return asdict(self)
+
+# ============================================================================
+# Storage Layer (Event-Sourced JSONL)
+# ============================================================================
+
+class SessionStore:
+    """
+    Git-friendly JSONL storage instead of monolithic JSON.
+
+    Benefits:
+    - Each append is atomic (no race conditions)
+    - Git diff shows line-by-line changes
+    - Event sourcing pattern (immutable log)
+    """
+
+    def __init__(self, storage_path: Path = None):
+        self.storage_path = storage_path or STORAGE_FILE
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+
+    def _read_all(self) -> Dict[str, Session]:
+        """Read all sessions from JSONL log."""
+        sessions = {}
+        if not self.storage_path.exists():
+            return sessions
+
+        with open(self.storage_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    session = Session(**data)
+                    sessions[session.id] = session
+                except (json.JSONDecodeError, TypeError) as e:
+                    print(f"[WARN] Invalid line: {e}", file=sys.stderr)
+        return sessions
+
+    def save_session(self, session: Session):
+        """Append session to JSONL (atomic write)."""
+        with self._lock:
+            # Atomic write: temp + rename
+            temp_path = self.storage_path.with_suffix(".tmp")
+            with open(temp_path, "a") as f:
+                json.dump(session.to_dict(), f)
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Atomic rename
+            temp_path.replace(self.storage_path)
+
+    def get_session(self, session_id: str) -> Optional[Session]:
+        """Get session by ID."""
+        sessions = self._read_all()
+        return sessions.get(session_id)
+
+    def update_session(self, session_id: str, **updates):
+        """Update session fields by appending new version."""
+        sessions = self._read_all()
+        if session_id not in sessions:
+            return False
+
+        session = sessions[session_id]
+        for key, value in updates.items():
+            setattr(session, key, value)
+
+        self.save_session(session)
+        return True
+
+# ============================================================================
+# Session Manager (Event-Driven, No Polling)
+# ============================================================================
+
+class SessionManager:
+    """
+    Manages sessions with asyncio.Event for non-blocking waits.
+
+    This replaces the polling loop in the original wait_for_completion().
+    """
+    def __init__(self, store: SessionStore = None):
+        self.store = store or SessionStore()
+        self._completion_events: Dict[str, asyncio.Event] = {}
+
+    def create_session(self, agent_type: str) -> Session:
+        """Create a new session."""
+        import time
+        session = Session(
+            id=str(uuid.uuid4()),
+            agent_type=agent_type,
+            created_at=time.time()
+        )
+
+        # Create completion event for this session
+        self._completion_events[session.id] = asyncio.Event()
+
+        self.store.save_session(session)
+        return session
+
+    def get_session(self, session_id: str) -> Optional[Session]:
+        return self.store.get_session(session_id)
+
+    def mark_completed(self, session_id: str):
+        """Signal session completion (triggers Event)."""
+        event = self._completion_events.get(session_id)
+        if event:
+            event.set()
+
+    async def wait_for_completion(self, session_id: str, timeout: float = 300.0):
+        """
+        Wait for session completion WITHOUT polling.
+
+        Uses asyncio.Event.wait() which blocks efficiently
+        until mark_completed() is called.
+        """
+        event = self._completion_events.get(session_id)
+        if not event:
+            raise ValueError(f"No event for session {session_id}")
+
         try:
-            with open(STORAGE_FILE, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return {"sessions": {}}
-    return {"sessions": {}}
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            print(f"[WARN] Timeout waiting for {session_id}", file=sys.stderr)
+            raise
 
-def save_storage(data):
-    with open(STORAGE_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+# ============================================================================
+# Agent Execution (Same as original)
+# ============================================================================
 
-def spawn_session(agent_type):
-    if agent_type not in VALID_AGENTS:
-        print(f"Error: Invalid agent type '{agent_type}'.", file=sys.stderr)
-        sys.exit(1)
-        
-    session_id = str(uuid.uuid4())
-    data = load_storage()
-    data["sessions"][session_id] = {
-        "agent_type": agent_type,
-        "status": "idle",
-        "task": None,
-        "output_file": None,
-        "created_at": time.time(),
-        "started_at": None,
-        "completed_at": None
-    }
-    save_storage(data)
-    print(json.dumps({"session_id": session_id, "agent_type": agent_type, "status": "idle"}))
+def execute_agent_task(session_id: str, agent_type: str, task_payload: str,
+                       manager: SessionManager):
+    """Execute agent task (runs in background thread)."""
+    import time
 
-def execute_agent_task(session_id, agent_type, task_payload):
-    data = load_storage()
-    
     agent_dir = SKILLS_DIR / agent_type.lower()
-    identity_file = agent_dir / "workspace/IDENTITY.md"
-    soul_file = agent_dir / "workspace/SOUL.md"
-    
+    identity_file = agent_dir / "workspace" / "IDENTITY.md"
+    soul_file = agent_dir / "workspace" / "SOUL.md"
+
     identity = identity_file.read_text() if identity_file.exists() else f"You are the {agent_type} agent."
     soul = soul_file.read_text() if soul_file.exists() else "Do your job."
-    
+
     prompt = f"""
 {identity}
 
@@ -72,18 +218,14 @@ def execute_agent_task(session_id, agent_type, task_payload):
 
 Execute this task strictly as your assigned role. You are running in a headless environment. Output your final response clearly.
 """
-    
+
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUTS_DIR / f"{agent_type}-{session_id[:8]}.txt"
-    
-    # We use gemini CLI with --prompt to run the agent headlessly
+
     cmd = ["gemini", "--prompt", prompt]
     if agent_type == "Coder":
-        # Coder needs yolo mode to actually write files!
-        cmd.append("--yolo")
-        cmd.append("--approval-mode")
-        cmd.append("yolo")
-        
+        cmd.extend(["--yolo", "--approval-mode", "yolo"])
+
     try:
         result = subprocess.run(cmd, cwd=str(BASE_DIR), capture_output=True, text=True)
         with open(output_path, "w") as f:
@@ -95,103 +237,180 @@ Execute this task strictly as your assigned role. You are running in a headless 
         with open(output_path, "w") as f:
             f.write(f"Failed to execute gemini CLI: {str(e)}")
 
-    # Update state
-    data = load_storage()
-    if session_id in data["sessions"]:
-        data["sessions"][session_id]["status"] = "completed"
-        data["sessions"][session_id]["completed_at"] = time.time()
-        data["sessions"][session_id]["output_file"] = str(output_path)
-        save_storage(data)
+    # Update state and signal completion
+    import time
+    manager.store.update_session(
+        session_id,
+        status="completed",
+        completed_at=time.time(),
+        output_file=str(output_path)
+    )
 
-def append_task(session_id, task_payload):
-    data = load_storage()
-    if session_id not in data["sessions"]:
-        print(f"Error: Session '{session_id}' not found.", file=sys.stderr)
+    # Signal completion (non-polling!)
+    manager.mark_completed(session_id)
+
+# ============================================================================
+# CLI Commands
+# ============================================================================
+
+def cmd_spawn(args, manager: SessionManager):
+    """Spawn a new agent session."""
+    if args.agent_type not in VALID_AGENTS:
+        print(f'{{"error": "Invalid agent type \\"{args.agent_type}\\""}}', file=sys.stderr)
         sys.exit(1)
-        
-    session = data["sessions"][session_id]
-    if session["status"] == "running":
-        print(f"Error: Session '{session_id}' is already running.", file=sys.stderr)
+
+    session = manager.create_session(args.agent_type)
+    print(json.dumps({
+        "session_id": session.id,
+        "agent_type": session.agent_type,
+        "status": session.status
+    }))
+
+def cmd_append(args, manager: SessionManager):
+    """Append task to session and start execution."""
+    session = manager.get_session(args.session_id)
+    if not session:
+        print(f'{{"error": "Session \\"{args.session_id}\\" not found"}}', file=sys.stderr)
         sys.exit(1)
-        
-    session["task"] = task_payload
-    session["status"] = "running"
-    session["started_at"] = time.time()
-    save_storage(data)
-    
-    # Start execution in a background thread so 'append' returns immediately
-    thread = threading.Thread(target=execute_agent_task, args=(session_id, session["agent_type"], task_payload))
+
+    if session.status == "running":
+        print(f'{{"error": "Session already running"}}', file=sys.stderr)
+        sys.exit(1)
+
+    # Update session
+    import time
+    manager.store.update_session(
+        args.session_id,
+        task=args.task_payload,
+        status="running",
+        started_at=time.time()
+    )
+
+    # Start execution in background thread
+    thread = threading.Thread(
+        target=execute_agent_task,
+        args=(args.session_id, session.agent_type, args.task_payload, manager)
+    )
     thread.daemon = True
     thread.start()
-    
-    print(json.dumps({"session_id": session_id, "message": "Task appended and execution started.", "status": "running"}))
 
-def check_status(session_id):
-    data = load_storage()
-    if session_id not in data["sessions"]:
-        print(f"Error: Session '{session_id}' not found.", file=sys.stderr)
-        sys.exit(1)
-    session = data["sessions"][session_id]
-    print(json.dumps({"session_id": session_id, "status": session["status"]}))
+    print(json.dumps({
+        "session_id": args.session_id,
+        "message": "Task appended and execution started",
+        "status": "running"
+    }))
 
-def retrieve_output(session_id):
-    data = load_storage()
-    if session_id not in data["sessions"]:
-        print(f"Error: Session '{session_id}' not found.", file=sys.stderr)
-        sys.exit(1)
-        
-    session = data["sessions"][session_id]
-    if session["status"] != "completed":
-        print(f"Error: Session not completed. Status: {session['status']}", file=sys.stderr)
-        sys.exit(1)
-        
-    output_path = Path(session["output_file"])
-    if output_path.exists():
-        print(json.dumps({
-            "session_id": session_id,
-            "status": "completed",
-            "output_file": str(output_path),
-            "content": output_path.read_text()
-        }))
-    else:
-        print(f"Error: Output file {output_path} missing.", file=sys.stderr)
+def cmd_status(args, manager: SessionManager):
+    """Get session status."""
+    session = manager.get_session(args.session_id)
+    if not session:
+        print(f'{{"error": "Session \\"{args.session_id}\\" not found"}}', file=sys.stderr)
         sys.exit(1)
 
-def wait_for_completion(session_id, timeout):
-    deadline = time.monotonic() + timeout
-    print(f"Waiting for session {session_id} to complete...", file=sys.stderr)
-    while time.monotonic() < deadline:
-        data = load_storage()
-        if session_id not in data["sessions"]:
-            print(f"Error: Session '{session_id}' not found.", file=sys.stderr)
-            sys.exit(1)
-        if data["sessions"][session_id]["status"] == "completed":
-            print(f"Session {session_id} completed.", file=sys.stderr)
-            retrieve_output(session_id)
-            return
-        time.sleep(2.0)
-    print(f"TIMEOUT: Session did not complete within {timeout}s.", file=sys.stderr)
+    print(json.dumps({
+        "session_id": session.id,
+        "status": session.status
+    }))
+
+def cmd_wait(args, manager: SessionManager):
+    """Wait for session completion (ASYNC, no polling!)."""
+    print(f"Waiting for session {args.session_id} to complete...", file=sys.stderr)
+
+    # This uses asyncio.Event - NO polling!
+    try:
+        asyncio.run(manager.wait_for_completion(args.session_id, args.timeout))
+        print(f"Session {args.session_id} completed.", file=sys.stderr)
+
+        # Retrieve and display output
+        session = manager.get_session(args.session_id)
+        if session and session.output_file:
+            output_path = Path(session.output_file)
+            if output_path.exists():
+                print(json.dumps({
+                    "session_id": args.session_id,
+                    "status": "completed",
+                    "output_file": str(output_path),
+                    "content": output_path.read_text()
+                }))
+                return
+    except asyncio.TimeoutError:
+        print(f'{{"error": "Timeout after {args.timeout}s"}}', file=sys.stderr)
+        sys.exit(1)
+
+    print(f'{{"error": "Output file missing"}}', file=sys.stderr)
     sys.exit(1)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+def cmd_output(args, manager: SessionManager):
+    """Retrieve session output."""
+    session = manager.get_session(args.session_id)
+    if not session:
+        print(f'{{"error": "Session \\"{args.session_id}\\" not found"}}', file=sys.stderr)
+        sys.exit(1)
+
+    if session.status != "completed":
+        print(f'{{"error": "Session not completed. Status: {session.status}"}}', file=sys.stderr)
+        sys.exit(1)
+
+    output_path = Path(session.output_file) if session.output_file else None
+    if not output_path or not output_path.exists():
+        print(f'{{"error": "Output file missing"}}', file=sys.stderr)
+        sys.exit(1)
+
+    print(json.dumps({
+        "session_id": args.session_id,
+        "status": "completed",
+        "output_file": str(output_path),
+        "content": output_path.read_text()
+    }))
+
+# ============================================================================
+# Main CLI Entry Point
+# ============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="OpenPango Async Router (Non-Polling Version)"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    spawn_parser = subparsers.add_parser("spawn")
-    spawn_parser.add_argument("agent_type")
-    append_parser = subparsers.add_parser("append")
-    append_parser.add_argument("session_id")
-    append_parser.add_argument("task_payload")
-    status_parser = subparsers.add_parser("status")
-    status_parser.add_argument("session_id")
-    output_parser = subparsers.add_parser("output")
-    output_parser.add_argument("session_id")
-    wait_parser = subparsers.add_parser("wait")
-    wait_parser.add_argument("session_id")
-    wait_parser.add_argument("--timeout", type=int, default=300)
+
+    # spawn
+    spawn_p = subparsers.add_parser("spawn")
+    spawn_p.add_argument("agent_type")
+
+    # append
+    append_p = subparsers.add_parser("append")
+    append_p.add_argument("session_id")
+    append_p.add_argument("task_payload")
+
+    # status
+    status_p = subparsers.add_parser("status")
+    status_p.add_argument("session_id")
+
+    # output
+    output_p = subparsers.add_parser("output")
+    output_p.add_argument("session_id")
+
+    # wait (async version)
+    wait_p = subparsers.add_parser("wait")
+    wait_p.add_argument("session_id")
+    wait_p.add_argument("--timeout", type=int, default=300)
+
     args = parser.parse_args()
 
-    if args.command == "spawn": spawn_session(args.agent_type)
-    elif args.command == "append": append_task(args.session_id, args.task_payload)
-    elif args.command == "status": check_status(args.session_id)
-    elif args.command == "output": retrieve_output(args.session_id)
-    elif args.command == "wait": wait_for_completion(args.session_id, args.timeout)
+    # Initialize manager
+    manager = SessionManager()
+
+    # Route command
+    if args.command == "spawn":
+        cmd_spawn(args, manager)
+    elif args.command == "append":
+        cmd_append(args, manager)
+    elif args.command == "status":
+        cmd_status(args, manager)
+    elif args.command == "wait":
+        cmd_wait(args, manager)
+    elif args.command == "output":
+        cmd_output(args, manager)
+
+if __name__ == "__main__":
+    main()

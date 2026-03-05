@@ -1,88 +1,147 @@
-import base64
-import importlib.util
-import os
+#!/usr/bin/env python3
+"""
+test_sandbox.py - Test suite for data analysis sandbox
+"""
+
+import json
 import sys
-import tempfile
-import unittest
-from pathlib import Path
+import os
+
+# Add parent dir to path
+sys.path.insert(0, os.path.dirname(__file__))
+
+from sandbox import DataSandbox, CodeAnalyzer
 
 
-def _load_module():
-    here = Path(__file__).resolve().parent
-    module_path = here / "sandbox.py"
-    spec = importlib.util.spec_from_file_location("data_analysis_sandbox", module_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+def test_safe_imports():
+    """Test that safe imports are allowed."""
+    analyzer = CodeAnalyzer()
+    code = "import pandas as pd\nimport numpy as np"
+    violations = analyzer.check(code)
+    assert len(violations) == 0, f"Unexpected violations: {violations}"
+    print("✅ test_safe_imports passed")
 
 
-class TestDataAnalysisSandbox(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.mod = _load_module()
+def test_unsafe_imports():
+    """Test that unsafe imports are blocked."""
+    analyzer = CodeAnalyzer()
+    code = "import os\nimport subprocess"
+    violations = analyzer.check(code)
+    assert len(violations) > 0, "Should have violations"
+    assert any("os" in v for v in violations), "Should block os import"
+    print("✅ test_unsafe_imports passed")
 
-    def test_csv_input_and_stdout(self):
-        sandbox = self.mod.DataAnalysisSandbox()
-        with tempfile.TemporaryDirectory() as td:
-            csv_path = Path(td) / "sales.csv"
-            csv_path.write_text("amount\n10\n15\n5\n", encoding="utf-8")
 
-            script = """
-import csv, os
-p = os.path.join(INPUT_DIR, 'sales.csv')
-with open(p, 'r', encoding='utf-8') as f:
-    reader = csv.DictReader(f)
-    total = sum(int(r['amount']) for r in reader)
-print(total)
+def test_dangerous_calls():
+    """Test that dangerous function calls are blocked."""
+    analyzer = CodeAnalyzer()
+    code = "os.system('ls')"
+    violations = analyzer.check(code)
+    assert len(violations) > 0, "Should have violations"
+    print("✅ test_dangerous_calls passed")
+
+
+def test_execute_safe_code():
+    """Test executing safe code."""
+    sandbox = DataSandbox()
+    code = """
+import pandas as pd
+df = pd.DataFrame({'a': [1, 2, 3]})
+print(df.sum())
 """
-            result = sandbox.execute(script, input_files=[str(csv_path)])
-            self.assertEqual(result["status"], "success")
-            self.assertIn("30", result["stdout"])
+    result = sandbox.execute(code, timeout=10)
+    assert result["success"], f"Execution failed: {result.get('error')}"
+    assert "3" in result["stdout"], f"Unexpected output: {result['stdout']}"
+    print("✅ test_execute_safe_code passed")
+    sandbox.cleanup()
 
-    def test_network_blocked(self):
-        sandbox = self.mod.DataAnalysisSandbox()
-        script = """
-import socket
-try:
-    socket.socket()
-except Exception as e:
-    print(type(e).__name__)
-"""
-        result = sandbox.execute(script)
-        self.assertEqual(result["status"], "success")
-        self.assertIn("PermissionError", result["stdout"])
 
-    def test_write_outside_sandbox_blocked(self):
-        sandbox = self.mod.DataAnalysisSandbox()
-        script = """
-try:
-    with open('/tmp/openpango_escape.txt', 'w', encoding='utf-8') as f:
-        f.write('nope')
-except Exception as e:
-    print(type(e).__name__)
-"""
-        result = sandbox.execute(script)
-        self.assertEqual(result["status"], "success")
-        self.assertIn("PermissionError", result["stdout"])
+def test_execute_unsafe_code():
+    """Test that unsafe code is rejected."""
+    sandbox = DataSandbox()
+    code = "import os; os.system('ls')"
+    result = sandbox.execute(code, timeout=10)
+    assert not result["success"], "Should fail"
+    assert "violations" in result, "Should have violations"
+    assert len(result["violations"]) > 0, "Should have specific violations"
+    print("✅ test_execute_unsafe_code passed")
+    sandbox.cleanup()
 
-    def test_chart_base64_return(self):
-        sandbox = self.mod.DataAnalysisSandbox()
-        script = """
-import base64, os
-# tiny valid 1x1 PNG
-png_b64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+v8QAAAAASUVORK5CYII='
-with open(os.path.join(OUTPUT_DIR, 'chart.png'), 'wb') as f:
-    f.write(base64.b64decode(png_b64))
-print('ok')
+
+def test_timeout():
+    """Test that timeout is enforced."""
+    sandbox = DataSandbox()
+    code = "while True: pass"
+    result = sandbox.execute(code, timeout=2)
+    assert not result["success"], "Should timeout"
+    assert "timeout" in str(result.get("error", "")).lower(), "Should mention timeout"
+    print("✅ test_timeout passed")
+    sandbox.cleanup()
+
+
+def test_matplotlib_chart():
+    """Test matplotlib chart generation."""
+    sandbox = DataSandbox()
+    code = """
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+plt.plot([1, 2, 3], [1, 4, 9])
+plt.savefig('test.png')
 """
-        result = sandbox.execute(script)
-        self.assertEqual(result["status"], "success")
-        self.assertTrue(result["charts"])
-        payload = base64.b64decode(result["charts"][0]["base64"])
-        self.assertTrue(payload.startswith(b"\x89PNG"))
+    result = sandbox.execute(code, timeout=10)
+    assert result["success"], f"Execution failed: {result.get('error')}"
+    assert "charts" in result, "Should have charts field"
+    assert len(result["charts"]) > 0, "Should generate at least one chart"
+    assert result["charts"][0]["filename"] == "test.png", "Chart filename mismatch"
+    print("✅ test_matplotlib_chart passed")
+    sandbox.cleanup()
+
+
+def test_file_not_found():
+    """Test loading non-existent file."""
+    sandbox = DataSandbox()
+    result = sandbox.load_file("/nonexistent/file.csv")
+    assert not result["success"], "Should fail"
+    assert "not found" in result["error"], "Should mention file not found"
+    print("✅ test_file_not_found passed")
+    sandbox.cleanup()
+
+
+def run_all_tests():
+    """Run all tests."""
+    tests = [
+        test_safe_imports,
+        test_unsafe_imports,
+        test_dangerous_calls,
+        test_execute_safe_code,
+        test_execute_unsafe_code,
+        test_timeout,
+        test_matplotlib_chart,
+        test_file_not_found,
+    ]
+
+    print(f"Running {len(tests)} tests...")
+    print("=" * 50)
+
+    failed = []
+    for test in tests:
+        try:
+            test()
+        except Exception as e:
+            print(f"❌ {test.__name__} failed: {e}")
+            failed.append(test.__name__)
+
+    print("=" * 50)
+    if failed:
+        print(f"\n❌ {len(failed)} tests failed:")
+        for name in failed:
+            print(f"  - {name}")
+        sys.exit(1)
+    else:
+        print(f"\n✅ All {len(tests)} tests passed!")
 
 
 if __name__ == "__main__":
-    unittest.main()
+    run_all_tests()

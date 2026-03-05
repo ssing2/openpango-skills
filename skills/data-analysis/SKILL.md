@@ -1,65 +1,189 @@
----
-name: data-analysis
-description: "Sandboxed Python data analysis execution with CSV/JSON inputs, restricted IO/network, and base64 chart outputs."
-version: "1.0.0"
-user-invocable: true
-metadata:
-  capabilities:
-    - data/analysis
-    - data/csv-json
-    - data/charts
-    - security/sandbox
-  author: "Antigravity (OpenPango Core)"
-  license: "MIT"
+# Data Analysis Skill
+
+**Version:** 1.0.0
+**Author:** 昕昕昶 (AI Agent)
+**Description:** Secure Jupyter-like sandbox for data analysis with pandas, numpy, and matplotlib
+
 ---
 
-# Data Analysis Sandbox Skill
+## 🎯 Purpose
 
-`skills/data-analysis/sandbox.py` provides a Jupyter-like execution sandbox for autonomous agents.
+Provides an isolated execution environment where AI agents can safely run data analysis code using pandas, numpy, and matplotlib without risking the host system.
 
-## What it does
+---
 
-- Runs untrusted Python analysis scripts in an isolated subprocess (`python -I`)
-- Enforces timeout + resource limits (CPU/memory/file descriptors where supported)
-- Mounts only CSV/JSON inputs into sandbox `input/`
-- Captures `stdout` and `stderr`
-- Returns generated chart artifacts (`png/jpg/jpeg/webp/svg`) as base64
-- Blocks common network/process breakout paths and file writes outside sandbox output
+## 📋 Features
 
-## Example
+- ✅ **AST-based security validation** - Detects dangerous operations before execution
+- ✅ **Restricted imports** - Only allows safe data analysis libraries
+- ✅ **Sandboxed subprocess execution** - Isolated from host system
+- ✅ **Resource limits** - Configurable timeout
+- ✅ **Chart encoding** - Base64-encoded matplotlib output
+- ✅ **File support** - CSV, JSON, Excel input
+- ✅ **Temporary workspace** - Auto-cleanup after execution
+
+---
+
+## 🚀 Usage
+
+### Execute code directly
+```bash
+python skills/data-analysis/sandbox.py execute \
+  --code "import pandas as pd; df = pd.DataFrame({'a': [1,2,3]}); print(df.sum())"
+```
+
+### Analyze a file
+```bash
+python skills/data-analysis/sandbox.py file \
+  --input data.csv \
+  --script analysis.py \
+  --format csv
+```
+
+---
+
+## 🔒 Security
+
+### Safe Imports
+- pandas
+- numpy
+- matplotlib
+- seaborn
+- scipy
+- sklearn
+- json, csv
+- base64
+- datetime, math, random
+
+### Blocked Operations
+- `open()`, `compile()`, `eval()`, `exec()`
+- `subprocess.*`, `os.system`
+- File I/O outside workspace
+- Network requests
+- `exit()`, `quit()`
+
+### Protection Layers
+1. **AST Analysis** - Parse code tree before execution
+2. **Import whitelist** - Only allowed libraries
+3. **Subprocess isolation** - Separate Python process
+4. **Temporary workspace** - Scoped filesystem access
+5. **Timeout enforcement** - Prevent infinite loops
+
+---
+
+## 📊 Example
 
 ```python
-from pathlib import Path
-import importlib.util
-
-sandbox_path = Path("skills/data-analysis/sandbox.py")
-spec = importlib.util.spec_from_file_location("data_analysis_sandbox", sandbox_path)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-
-sandbox = mod.DataAnalysisSandbox()
-result = sandbox.execute(
-    """
-import os
+# Input code
+code = """
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv(os.path.join(INPUT_DIR, 'sales.csv'))
-print(df.describe().to_string())
+# Load data
+df = pd.DataFrame({
+    'category': ['A', 'B', 'C'],
+    'value': [10, 20, 15]
+})
 
-plt.figure(figsize=(6, 3))
-plt.plot(df['revenue'])
-plt.title('Revenue trend')
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, 'revenue.png'))
-""",
-    input_files=["./sales.csv"],
-)
+# Analyze
+summary = df.groupby('category').sum()
+print(summary)
 
-print(result["stdout"])
-print(result["charts"][0]["base64"][:80])
+# Visualize
+df.plot(kind='bar')
+plt.savefig('output.png')
+"""
+
+# Execute
+result = sandbox.execute(code)
+
+# Result
+{
+  "success": true,
+  "stdout": "category\\nA    10\\nB    20\\nC    15",
+  "stderr": "",
+  "returncode": 0,
+  "charts": [
+    {
+      "filename": "output.png",
+      "base64": "iVBORw0KGgoAAAANSUhEUg...",
+      "size": 12345
+    }
+  ]
+}
 ```
 
-## Security Notes
+---
 
-This sandbox adds strong application-layer restrictions but is not equivalent to a full container VM boundary. For high-risk multi-tenant use, run this inside a container/sandbox runtime as an additional isolation layer.
+## 🧪 Testing
+
+```bash
+# Safe operation
+python sandbox.py execute --code "import pandas as pd; print(pd.__version__)"
+# ✅ Success
+
+# Blocked operation
+python sandbox.py execute --code "import os; os.system('ls')"
+# ❌ Violations: ["Unsafe import: os", "Dangerous call: os.system"]
+
+# Timeout protection
+python sandbox.py execute --code "while True: pass" --timeout 5
+# ❌ Execution timeout
+```
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+- `PYTHONPATH` - Auto-set to workspace
+- `MPLBACKEND` - Set to 'Agg' for non-interactive plotting
+
+### Timeout
+- Default: 30 seconds
+- Configurable via `--timeout` argument
+
+### Workspace
+- Location: `/tmp/data_sandbox_*`
+- Auto-cleanup after execution
+- Keep for debugging: Comment out `sandbox.cleanup()`
+
+---
+
+## 📖 Integration
+
+### In OpenClaw Skills
+```python
+from skills.data_analysis.sandbox import DataSandbox
+
+sandbox = DataSandbox()
+result = sandbox.execute(user_code)
+if result["success"]:
+    print(result["stdout"])
+    # Use charts
+    for chart in result["charts"]:
+        display_image(chart["base64"])
+```
+
+---
+
+## ⚠️ Limitations
+
+1. **No network access** - Cannot download data
+2. **No file write outside workspace** - Output only
+3. **Memory limits** - Restricted by subprocess
+4. **No interactive debugging** - Execute-and-forget model
+
+---
+
+## 🎁 Bonus Features
+
+- **Chart encoding** - Automatic matplotlib → base64
+- **Multi-format input** - CSV, JSON, Excel support
+- **Error traces** - Detailed exception information
+- **Workspace persistence** - Optional for debugging
+
+---
+
+*Part of OpenPango Skills Suite*
+*Bounty #12: Data Analysis & Jupyter-like Sandbox Skill*
